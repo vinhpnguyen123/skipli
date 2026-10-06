@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env*
+!.env.example
+serviceAccount*.json
+firebase-debug.log
+*.tsbuildinfo
+.vercel
+.DS_Store

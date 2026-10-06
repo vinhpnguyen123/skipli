@@ -1,0 +1,23 @@
+{
+  "name": "skipli",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n client,server -c cyan,magenta \"npm -w client run dev\" \"npm -w server run dev\"",
+    "build": "npm -w client run build && npm -w server run build",
+    "emulators": "firebase emulators:start --only firestore",
+    "seed": "npm -w server run seed",
+    "lint": "oxlint client/src server/src",
+    "format": "prettier --write .",
+    "typecheck": "npm -w client exec -- tsc -b && npm -w server exec -- tsc --noEmit",
+    "test": "npm -w server test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "oxlint": "^1.81.0",
+    "prettier": "^3.4.2"
+  }
+}

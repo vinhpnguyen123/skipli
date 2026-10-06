@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build -w client",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/socket.io/(.*)", "destination": "/api/index" }
+  ],
+  "crons": [{ "path": "/api/cron/due-reminders", "schedule": "0 * * * *" }]
+}
