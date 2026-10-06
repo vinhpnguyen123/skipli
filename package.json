@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "concurrently -n client,server -c cyan,magenta \"npm -w client run dev\" \"npm -w server run dev\"",
     "build": "npm -w client run build && npm -w server run build",
-    "emulators": "firebase emulators:start --only firestore",
+    "emulators": "firebase emulators:start --only firestore --project skipli-dev",
     "seed": "npm -w server run seed",
     "lint": "oxlint client/src server/src",
     "format": "prettier --write .",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "firebase-tools": "^15.32.1",
     "oxlint": "^1.81.0",
     "prettier": "^3.4.2"
   }
