@@ -55,6 +55,6 @@ lib/          api client (refresh interceptor), socket client, formatters
 
 ## Testing
 
-- Server: Jest + Supertest against the Firebase emulators; Twilio and email mocked.
+- Server: Jest + Supertest against the `skipli-dev` Firestore project; Twilio and email mocked.
 - Must-have cases: OTP expiry, 5-attempt lockout, rate limits, setup token reuse/expiry, refresh token reuse, role checks, ownership (IDOR), task version conflict, duplicate `clientMessageId`.
 - Test names describe behavior: `rejects a reused setup token`.

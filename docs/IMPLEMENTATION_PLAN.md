@@ -4,7 +4,7 @@ About 12 working days. Each phase ends with a working deploy and a git tag.
 
 ## Phase 0 — Setup and skeleton deploy (day 1) · `v0.1.0`
 - [ ] Public repo, monorepo `client/` + `server/`, ESLint, Prettier, TypeScript
-- [ ] Firebase project, Firestore, service account; deny-all Security Rules
+- [ ] Two Firebase projects (`skipli-dev`, `skipli-prod`), Firestore, service accounts; deny-all Security Rules
 - [ ] Accounts: Twilio (verify your number), Resend, Upstash Redis
 - [ ] `.env.example` with every variable from `ARCHITECTURE.md`
 - [ ] Express `/api/health`, central error handler, helmet, CORS
@@ -64,7 +64,7 @@ About 12 working days. Each phase ends with a working deploy and a git tag.
 - [ ] Audit log page with cursor pagination
 
 ## Phase 6 — Testing, CI, README, submission (days 11–12) · `v1.0.0`
-- [ ] Emulator tests for all security cases + version conflict + message dedup
+- [ ] Tests (against `skipli-dev`) for all security cases + version conflict + message dedup
 - [ ] GitHub Actions: lint, typecheck, test
 - [ ] Loading/empty/error states, mobile layout, compare against Skipli's Figma
 - [ ] README: live link, demo accounts, Loom video, architecture diagram, structure, run locally, env table, API summary, design decisions, security, screenshots

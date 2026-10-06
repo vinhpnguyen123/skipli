@@ -51,4 +51,4 @@ Security: hashed OTPs with 5-minute expiry and 5-attempt lockout; rate limits pe
 
 Features: realtime kanban with optimistic locking; chat presence, typing indicators, read receipts, unread counts; weekly schedule grid; activity feed + audit log; due dates, notifications, and due-date reminders.
 
-Quality: tests on the emulator, CI, architecture docs, demo video.
+Quality: tests against the dev Firestore project, CI, architecture docs, demo video.

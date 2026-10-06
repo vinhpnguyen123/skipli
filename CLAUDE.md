@@ -12,21 +12,20 @@ Skipli coding challenge: a **real-time employee task management tool**. An owner
 | --- | --- |
 | Frontend | Vite + React + TypeScript, React Router, TanStack Query, dnd-kit, Tailwind |
 | Backend | Express + TypeScript, Socket.IO, Zod, bcrypt, jsonwebtoken, helmet |
-| Database | Firestore via `firebase-admin` (no client SDK access) |
+| Database | Firestore via `firebase-admin`, two projects: `skipli-dev`, `skipli-prod` (no client SDK access) |
 | Realtime scaling | Upstash Redis (Socket.IO adapter, presence, rate limits) |
 | SMS / email | Twilio / Resend |
 | Deploy | Vercel (static + Functions + Cron), one domain |
-| Tests / CI | Jest, Supertest, Firebase Emulator Suite, GitHub Actions |
+| Tests / CI | Jest, Supertest, GitHub Actions |
 
 ## Commands
 
 ```bash
 npm install                 # root, installs client + server workspaces
 npm run dev                 # client (5173) + server (3000) concurrently
-npm run emulators           # Firebase Emulator Suite
-npm run seed                # seed owner + demo employees
+npm run seed                # seed owner + demo employees into skipli-dev
 npm run lint && npm run typecheck
-npm test                    # server tests against emulators
+npm test                    # server tests against the skipli-dev project
 ```
 
 ## Non-negotiable rules
