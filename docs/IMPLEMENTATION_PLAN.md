@@ -3,13 +3,13 @@
 About 12 working days. Each phase ends with a working deploy and a git tag.
 
 ## Phase 0 — Setup and skeleton deploy (day 1) · `v0.1.0`
-- [ ] Public repo, monorepo `client/` + `server/`, ESLint, Prettier, TypeScript
-- [ ] Two Firebase projects (`skipli-dev`, `skipli-prod`), Firestore, service accounts; deny-all Security Rules
-- [ ] Accounts: Twilio (verify your number), Resend, Upstash Redis
-- [ ] `.env.example` with every variable from `ARCHITECTURE.md`
-- [ ] Express `/api/health`, central error handler, helmet, CORS
-- [ ] Socket.IO server; client with `transports: ['websocket']`; ping/pong works
-- [ ] Seed script: owner + demo employees
+- [~] Monorepo `client/` + `server/`, oxlint, Prettier, TypeScript — *repo is local; not pushed to GitHub yet*
+- [~] Two Firebase projects (`skipli-dev`, `skipli-prod`), Firestore, service accounts; deny-all Security Rules — *projects + keys done; create the Firestore database, deploy rules*
+- [x] Accounts: Twilio (verify your number), Resend, Upstash Redis
+- [x] `.env.example` with every variable from `ARCHITECTURE.md`
+- [x] Express `/api/health`, central error handler, helmet, CORS
+- [x] Socket.IO server; client with `transports: ['websocket']`; ping/pong works
+- [~] Seed script: owner + demo employees — *written, blocked on the Firestore database*
 - [ ] Deploy to Vercel; confirm WebSocket works on the real domain
 - [ ] If WebSocket is unstable: move server to Render/Railway now
 
