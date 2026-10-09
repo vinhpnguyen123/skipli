@@ -1,0 +1,46 @@
+# Render hosts the Express + Socket.IO server; Vercel keeps the static client.
+# Secrets are set in the Render dashboard (sync: false = "ask me, don't store in git").
+services:
+  - type: web
+    name: skipli-api
+    runtime: node
+    plan: free
+    region: virginia # same metro as Firestore us-east4
+    buildCommand: npm install && npm run build -w server
+    startCommand: npm run start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_URL
+        sync: false
+      - key: BUSINESS_TZ
+        value: America/New_York
+      - key: DEMO_MODE
+        value: "true"
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: OTP_HMAC_SECRET
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: REDIS_URL
+        sync: false
