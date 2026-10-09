@@ -19,5 +19,6 @@
     "firebase-tools": "^15.32.1",
     "oxlint": "^1.81.0",
     "prettier": "^3.4.2"
-  }
+  },
+  "type": "module"
 }

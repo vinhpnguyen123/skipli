@@ -7,3 +7,8 @@ firebase-debug.log
 *.tsbuildinfo
 .vercel
 .DS_Store
+
+# AI assistant context — kept local, not part of the submission
+.claude/
+CLAUDE.md
+docs/

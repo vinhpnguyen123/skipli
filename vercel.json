@@ -5,5 +5,5 @@
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/socket.io/(.*)", "destination": "/api/index" }
   ],
-  "crons": [{ "path": "/api/cron/due-reminders", "schedule": "0 * * * *" }]
+  "crons": [{ "path": "/api/cron/due-reminders", "schedule": "0 9 * * *" }]
 }
