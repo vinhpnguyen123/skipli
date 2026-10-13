@@ -11,6 +11,18 @@ const owner = {
   department: 'Management',
   title: 'Manager',
   status: 'active' as const,
+  demo: false,
+};
+
+// demo: true + DEMO_MODE=true → login codes come back in the API response instead of by SMS/email,
+// so reviewers can sign in. 555-01xx numbers are reserved for fiction.
+const demoOwner = {
+  ...owner,
+  id: 'demo-owner',
+  name: 'Demo Owner',
+  email: 'demo.owner@example.com',
+  phone: '+15555550100',
+  demo: true,
 };
 
 const employees = [
@@ -43,14 +55,21 @@ async function seed() {
   };
 
   const batch = db.batch();
-  const { id, ...ownerDoc } = owner;
-  batch.set(db.collection('users').doc(id), { ...base, ...ownerDoc });
+  for (const { id, ...doc } of [owner, demoOwner]) {
+    batch.set(db.collection('users').doc(id), { ...base, ...doc });
+  }
   for (const { id, ...doc } of employees) {
-    batch.set(db.collection('users').doc(id), { ...base, ...doc, role: 'employee', status: 'invited' });
+    batch.set(db.collection('users').doc(id), {
+      ...base,
+      ...doc,
+      role: 'employee',
+      status: 'invited',
+      demo: true,
+    });
   }
   await batch.commit();
 
-  console.log(`seeded owner ${owner.phone} + ${employees.length} employees`);
+  console.log(`seeded owner, demo owner ${demoOwner.phone}, ${employees.length} employees`);
 }
 
 seed().catch((err) => {
