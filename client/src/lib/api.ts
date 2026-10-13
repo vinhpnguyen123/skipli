@@ -64,12 +64,15 @@ export function refreshSession(): Promise<User> {
   return refreshing;
 }
 
-// Retries once after refreshing when the access token has expired.
+// On a 401 for the access token, refresh once and retry. If the account is gone (deleted, disabled) the
+// refresh fails too, which ends the session and sends the user to /login.
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     return await request<T>(path, init);
   } catch (err) {
-    if (!(err instanceof ApiError && err.code === 'TOKEN_EXPIRED')) throw err;
+    const authFailed =
+      err instanceof ApiError && (err.code === 'TOKEN_EXPIRED' || err.code === 'UNAUTHENTICATED');
+    if (!authFailed) throw err;
     await refreshSession();
     return request<T>(path, init);
   }

@@ -19,6 +19,9 @@ export const env = {
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
   TWILIO_FROM: process.env.TWILIO_FROM,
+  // Optional: without them invite emails fail (logged); in DEMO_MODE the owner still gets the invite link.
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM,
 };
 
 function trustProxy(value: string): number | string {

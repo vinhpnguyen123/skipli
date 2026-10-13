@@ -4,7 +4,7 @@ export type User = {
   role: 'owner' | 'employee';
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   department: string;
   title: string;
   status: 'invited' | 'active' | 'disabled';

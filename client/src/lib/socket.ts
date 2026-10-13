@@ -11,14 +11,21 @@ export const socket = io(import.meta.env.VITE_API_URL || undefined, {
   auth: (cb) => cb({ token: getAccessToken() }),
 });
 
-// A rejected handshake doesn't auto-retry. If the token had expired, refresh it and reconnect;
-// if the refresh fails the session is over and the route guard takes over.
-socket.on('connect_error', async (err) => {
-  if (err.message !== 'Access token expired') return;
+// Neither a rejected handshake nor a server-side disconnect retries on its own. Refresh the session and
+// reconnect; if the refresh fails (token gone, account deleted) the session ends and the route guard takes over.
+async function reconnectWithFreshToken() {
   try {
     await refreshSession();
     socket.connect();
   } catch {
     // signed out
   }
+}
+
+socket.on('connect_error', (err) => {
+  if (err.message === 'Access token expired' || err.message === 'Account unavailable')
+    void reconnectWithFreshToken();
+});
+socket.on('disconnect', (reason) => {
+  if (reason === 'io server disconnect') void reconnectWithFreshToken();
 });

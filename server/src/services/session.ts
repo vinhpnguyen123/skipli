@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../env.js';
 import { AppError } from '../lib/errors.js';
 import { db } from '../lib/firebase.js';
-import type { AuthUser } from '../middleware/auth.js';
+import type { TokenClaims } from '../middleware/auth.js';
 
 export const ACCESS_TOKEN_TTL_SEC = 15 * 60;
 export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -12,7 +12,7 @@ export const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const tokens = db.collection('refreshTokens');
 const hash = (raw: string) => createHash('sha256').update(raw).digest('hex');
 
-export const signAccessToken = (user: AuthUser) =>
+export const signAccessToken = (user: TokenClaims) =>
   jwt.sign({ role: user.role }, env.JWT_ACCESS_SECRET, {
     subject: user.id,
     expiresIn: ACCESS_TOKEN_TTL_SEC,

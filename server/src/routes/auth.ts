@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { AppError } from '../lib/errors.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { getUser, toPublicUser, type PublicUser } from '../services/auth.js';
+import { getActiveUser, toPublicUser, type PublicUser } from '../services/users.js';
 import {
   ACCESS_TOKEN_TTL_SEC,
   issueRefreshToken,
@@ -45,11 +45,8 @@ authRouter.post(
     if (typeof raw !== 'string' || !raw) throw new AppError('UNAUTHENTICATED', 'No session', 401);
     try {
       const rotated = await rotateRefreshToken(raw);
-      const snap = await getUser(rotated.userId);
       // Deleted or disabled since sign-in: the session ends here.
-      if (!snap || snap.data()?.status !== 'active')
-        throw new AppError('UNAUTHENTICATED', 'Account unavailable', 401);
-      const user = toPublicUser(snap);
+      const user = toPublicUser(await getActiveUser(rotated.userId));
       res.cookie(COOKIE, rotated.raw, { ...cookieOptions, maxAge: REFRESH_TOKEN_TTL_MS });
       res.json({ accessToken: signAccessToken(user), expiresIn: ACCESS_TOKEN_TTL_SEC, user });
     } catch (err) {
