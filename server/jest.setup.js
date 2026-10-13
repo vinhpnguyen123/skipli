@@ -7,3 +7,5 @@ if (existsSync('.env')) {
   for (const [k, v] of Object.entries(parseEnv(readFileSync('.env', 'utf8')))) process.env[k] ??= v;
 }
 process.env.JWT_ACCESS_SECRET ??= 'test-access-secret';
+// Satisfies env.ts in CI; unit tests mock lib/redis, so nothing connects to it.
+process.env.REDIS_URL ??= 'redis://localhost:6379';

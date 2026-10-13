@@ -12,4 +12,10 @@ export const env = {
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? 'skipli-dev',
   JWT_ACCESS_SECRET: required('JWT_ACCESS_SECRET'),
   REDIS_URL: required('REDIS_URL'),
+  // Express 'trust proxy': a hop count (Render = 1) or an IP/CIDR list. req.ip, and so rate limits, depend on it.
+  TRUST_PROXY: trustProxy(process.env.TRUST_PROXY ?? '1'),
 };
+
+function trustProxy(value: string): number | string {
+  return /^\d+$/.test(value) ? Number(value) : value;
+}

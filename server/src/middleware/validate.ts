@@ -2,16 +2,27 @@ import type { RequestHandler } from 'express';
 import type { ZodTypeAny } from 'zod';
 import { AppError } from '../lib/errors.js';
 
-// ponytail: body only. Route params are ids the service looks up anyway; add params/query when a route needs them
-// (Express 5's req.query is read-only, so a parsed query would go on res.locals).
+type Schemas = { body?: ZodTypeAny; params?: ZodTypeAny; query?: ZodTypeAny };
+
+// Usage: validate({ body: createEmployeeSchema, params: idParams }). Each schema should be .strict().
+// Every part is checked before failing, so the client gets all errors at once.
 export const validate =
-  (schema: ZodTypeAny): RequestHandler =>
+  (schemas: Schemas): RequestHandler =>
   (req, _res, next) => {
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      const details = result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }));
-      throw new AppError('VALIDATION_ERROR', 'Invalid request body', 400, details);
+    const details: { in: string; path: string; message: string }[] = [];
+    const parsed: Partial<Record<keyof Schemas, unknown>> = {};
+    for (const part of ['params', 'query', 'body'] as const) {
+      const schema = schemas[part];
+      if (!schema) continue;
+      const result = schema.safeParse(req[part]);
+      if (result.success) parsed[part] = result.data;
+      else for (const i of result.error.issues) details.push({ in: part, path: i.path.join('.'), message: i.message });
     }
-    req.body = result.data;
+    if (details.length) throw new AppError('VALIDATION_ERROR', 'Invalid request', 400, details);
+
+    if ('body' in parsed) req.body = parsed.body;
+    if ('params' in parsed) req.params = parsed.params as typeof req.params;
+    // Express 5 exposes req.query as a getter, so shadow it on the instance to hand over the parsed value.
+    if ('query' in parsed) Object.defineProperty(req, 'query', { value: parsed.query, writable: true, enumerable: true });
     next();
   };

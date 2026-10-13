@@ -10,9 +10,19 @@ import { validate } from './validate.js';
 
 const app = express();
 app.use(express.json());
-app.post('/echo', validate(z.object({ name: z.string().min(1) }).strict()), (req, res) => {
+app.post('/echo', validate({ body: z.object({ name: z.string().min(1) }).strict() }), (req, res) => {
   res.json(req.body);
 });
+app.get(
+  '/items/:id',
+  validate({
+    params: z.object({ id: z.string().regex(/^\w+$/) }).strict(),
+    query: z.object({ limit: z.coerce.number().int().max(50).default(20) }).strict(),
+  }),
+  (req, res) => {
+    res.json({ id: req.params.id, query: req.query });
+  },
+);
 app.get('/me', requireAuth, (req, res) => {
   res.json(req.user);
 });
@@ -45,7 +55,24 @@ describe('validate', () => {
   it('rejects a missing required field with its path', async () => {
     const res = await request(app).post('/echo').send({});
     expect(res.status).toBe(400);
-    expect(res.body.error.details[0].path).toBe('name');
+    expect(res.body.error.details[0]).toMatchObject({ in: 'body', path: 'name' });
+  });
+
+  it('hands the parsed, coerced query and params to the handler', async () => {
+    const res = await request(app).get('/items/abc?limit=5');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'abc', query: { limit: 5 } });
+  });
+
+  it('applies query defaults', async () => {
+    const res = await request(app).get('/items/abc');
+    expect(res.body.query).toEqual({ limit: 20 });
+  });
+
+  it('rejects unknown query fields and bad params, reporting each', async () => {
+    const res = await request(app).get('/items/a-b?limit=5&admin=1');
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.map((d: { in: string }) => d.in).sort()).toEqual(['params', 'query']);
   });
 
   it('returns 400 for malformed JSON', async () => {

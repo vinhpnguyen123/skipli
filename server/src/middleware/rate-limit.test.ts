@@ -1,32 +1,43 @@
-import { randomUUID } from 'node:crypto';
 import { jest } from '@jest/globals';
 import express from 'express';
+import RedisMock from 'ioredis-mock';
 import request from 'supertest';
-import { errorHandler } from '../lib/errors.js';
-import { redis } from '../lib/redis.js';
-import { rateLimit } from './rate-limit.js';
 
-// Unique name per run so counters from earlier runs (same IP, live Redis) don't leak in.
-const run = randomUUID();
+// In-memory Redis: no credentials, no quota. Real Redis is covered by rate-limit.integration.test.ts.
+const redis = new RedisMock();
+jest.unstable_mockModule('../lib/redis.js', () => ({ redis }));
+const { errorHandler } = await import('../lib/errors.js');
+const { rateLimit } = await import('./rate-limit.js');
+
+const ok: express.RequestHandler = (_req, res) => {
+  res.json({ ok: true });
+};
+const byPhone = (req: express.Request) => req.body.phone;
+
 const app = express();
 app.use(express.json());
-app.post('/ip', rateLimit({ name: `test-ip-${run}`, limit: 2, windowSec: 60, by: 'ip' }), (_req, res) => {
-  res.json({ ok: true });
-});
+app.post('/ip', rateLimit({ name: 'ip', limit: 2, windowSec: 60, by: 'ip' }), ok);
+app.post('/target', rateLimit({ name: 'target', limit: 1, windowSec: 60, by: 'target', target: byPhone }), ok);
 app.post(
-  '/target',
-  rateLimit({ name: `test-target-${run}`, limit: 1, windowSec: 60, by: 'target', target: (req) => req.body.phone }),
-  (_req, res) => {
-    res.json({ ok: true });
-  },
+  '/otp',
+  rateLimit({ name: 'otp', limit: 1, windowSec: 60, by: 'target', target: byPhone, onRedisDown: 'memory' }),
+  ok,
 );
 app.use(errorHandler);
 
-afterAll(async () => {
-  const keys = await redis.keys(`rl:*:test-*-${run}:*`);
-  if (keys.length) await redis.del(...keys);
-  await redis.quit();
+beforeEach(async () => {
+  await redis.flushall();
 });
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+const redisDown = () => {
+  jest.spyOn(redis, 'multi').mockImplementation(() => {
+    throw new Error('down');
+  });
+  return jest.spyOn(console, 'warn').mockImplementation(() => {});
+};
 
 describe('rateLimit', () => {
   it('returns 429 with Retry-After once an IP passes the limit', async () => {
@@ -45,22 +56,26 @@ describe('rateLimit', () => {
   });
 
   it('stores a TTL and never the raw target in the key', async () => {
-    const keys = await redis.keys(`rl:target:test-target-${run}:*`);
-    expect(keys.length).toBeGreaterThan(0);
-    expect(keys.join()).not.toContain('+1555');
+    await request(app).post('/target').send({ phone: '+15550001' });
+    const keys = await redis.keys('rl:target:target:*');
+    expect(keys).toHaveLength(1);
+    expect(keys[0]).not.toContain('+1555');
     expect(await redis.ttl(keys[0])).toBeGreaterThan(0);
   });
 
-  it('fails open when Redis errors', async () => {
-    const spy = jest.spyOn(redis, 'multi').mockImplementation(() => {
-      throw new Error('down');
-    });
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    try {
-      const res = await request(app).post('/target').send({ phone: '+15550001' });
-      expect(res.status).toBe(200);
-    } finally {
-      spy.mockRestore();
-    }
+  it('fails open on general routes when Redis is down, with a warning', async () => {
+    const warn = redisDown();
+    expect((await request(app).post('/target').send({ phone: '+15550001' })).status).toBe(200);
+    expect((await request(app).post('/target').send({ phone: '+15550001' })).status).toBe(200);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('keeps limiting OTP routes in memory when Redis is down, with a warning', async () => {
+    const warn = redisDown();
+    expect((await request(app).post('/otp').send({ phone: '+15550003' })).status).toBe(200);
+    const res = await request(app).post('/otp').send({ phone: '+15550003' });
+    expect(res.status).toBe(429);
+    expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
+    expect(warn).toHaveBeenCalled();
   });
 });
