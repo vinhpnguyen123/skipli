@@ -7,6 +7,8 @@ import { errorHandler } from './lib/errors.js';
 
 export function createApp() {
   const app = express();
+  // So req.ip is the client, not Render's load balancer. Rate limits key on it.
+  app.set('trust proxy', env.TRUST_PROXY);
   app.use(helmet());
   app.use(cors({ origin: env.APP_URL, credentials: true }));
   app.use(express.json());
