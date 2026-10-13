@@ -11,9 +11,14 @@ export const env = {
   DEMO_MODE: process.env.DEMO_MODE === 'true',
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? 'skipli-dev',
   JWT_ACCESS_SECRET: required('JWT_ACCESS_SECRET'),
+  OTP_HMAC_SECRET: required('OTP_HMAC_SECRET'),
   REDIS_URL: required('REDIS_URL'),
   // Express 'trust proxy': a hop count (Render = 1) or an IP/CIDR list. req.ip, and so rate limits, depend on it.
   TRUST_PROXY: trustProxy(process.env.TRUST_PROXY ?? '1'),
+  // Optional: without them SMS sends fail (logged), and only demo accounts can sign in.
+  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+  TWILIO_FROM: process.env.TWILIO_FROM,
 };
 
 function trustProxy(value: string): number | string {

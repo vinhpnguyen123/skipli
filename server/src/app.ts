@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './env.js';
 import { errorHandler } from './lib/errors.js';
+import { authRouter } from './routes/auth.js';
+import { ownerRouter } from './routes/owner.js';
 
 export function createApp() {
   const app = express();
@@ -17,6 +19,8 @@ export function createApp() {
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, uptime: process.uptime() });
   });
+  app.use('/api/owner', ownerRouter);
+  app.use('/api/auth', authRouter);
 
   app.use(errorHandler);
   return app;
