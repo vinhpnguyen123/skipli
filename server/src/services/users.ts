@@ -5,6 +5,12 @@ import type { Role } from '../middleware/auth.js';
 
 export const users = db.collection('users');
 
+// Firestore has no unique constraints. Each email/phone/username in use owns a doc here, created and deleted in
+// the same transaction as the user, so two concurrent requests can't both claim the same value.
+export type UniqueField = 'email' | 'phone' | 'username';
+export const uniqueRef = (field: UniqueField, value: string) =>
+  db.collection('uniques').doc(`${field}:${value}`);
+
 // What the client gets back; never includes passwordHash or lockout fields.
 export type PublicUser = {
   id: string;
@@ -14,6 +20,7 @@ export type PublicUser = {
   phone: string | null;
   department: string;
   title: string;
+  username: string | null;
   status: 'invited' | 'active' | 'disabled';
 };
 
@@ -27,6 +34,7 @@ export function toPublicUser(snap: DocumentSnapshot): PublicUser {
     phone: d.phone ?? null,
     department: d.department,
     title: d.title ?? '',
+    username: d.username ?? null,
     status: d.status,
   };
 }

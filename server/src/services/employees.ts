@@ -10,13 +10,14 @@ import { codeRef } from './access-code.js';
 import { recordActivity } from './activity.js';
 import { assertCanAccess } from './authz.js';
 import { issueSetupToken, setupTokens, setupUrl } from './setup-token.js';
-import { getUser, toPublicUser, users, type PublicUser } from './users.js';
-
-// Firestore has no unique constraints. Each email/phone in use owns a doc here, created and deleted in the
-// same transaction as the user, so two concurrent requests can't both claim the same value.
-type UniqueField = 'email' | 'phone';
-const uniqueRef = (field: UniqueField, value: string) =>
-  db.collection('uniques').doc(`${field}:${value}`);
+import {
+  getUser,
+  toPublicUser,
+  uniqueRef,
+  users,
+  type PublicUser,
+  type UniqueField,
+} from './users.js';
 
 async function assertAvailable(tx: Transaction, claims: [UniqueField, string][]) {
   if (!claims.length) return;
@@ -156,7 +157,8 @@ export async function updateEmployee(
   return toPublicUser((await getUser(id))!);
 }
 
-// Hard delete: the user doc and everything that could still let them in (refresh tokens, setup links, a pending
+// Hard delete: the user doc, their email/phone/username, and everything that could still let them in (refresh
+// tokens, setup links, a pending
 // email code) go in one transaction, then their open sockets are dropped. requireAuth re-checks the account, so
 // an access token they still hold stops working immediately. The activity entry keeps a copy of the name.
 // Phase 3: unassign their open tasks in this same transaction.
@@ -172,6 +174,7 @@ export async function deleteEmployee(actor: AuthUser, id: string): Promise<void>
     tx.delete(ref);
     tx.delete(uniqueRef('email', current.email));
     if (current.phone) tx.delete(uniqueRef('phone', current.phone));
+    if (current.username) tx.delete(uniqueRef('username', current.username));
     tx.delete(codeRef('email', current.email));
     for (const doc of [...refresh.docs, ...setup.docs]) tx.delete(doc.ref);
     recordActivity(tx, {

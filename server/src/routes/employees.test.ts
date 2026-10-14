@@ -52,15 +52,13 @@ beforeAll(async () => {
   Object.assign(asOwner, bearer(owner));
   const base = { email: `${run}@example.com`, department: 'Test', title: '', status: 'active' };
   await users.doc(owner.id).set({ ...base, role: 'owner', name: 'Test Owner', phone: null });
-  await users
-    .doc(coworker.id)
-    .set({
-      ...base,
-      role: 'employee',
-      name: 'Coworker',
-      email: `co-${run}@example.com`,
-      phone: null,
-    });
+  await users.doc(coworker.id).set({
+    ...base,
+    role: 'employee',
+    name: 'Coworker',
+    email: `co-${run}@example.com`,
+    phone: null,
+  });
 });
 
 beforeEach(() => sendEmail.mockClear());

@@ -6,6 +6,7 @@ import { socket } from './lib/socket';
 import type { User } from './lib/types';
 import EmployeesPage from './pages/EmployeesPage';
 import LoginPage from './pages/LoginPage';
+import SetupPage from './pages/SetupPage';
 
 export default function App() {
   const session = useSession();
@@ -27,6 +28,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+        {/* Reachable signed in or out: an owner testing an invite link shouldn't be bounced away. */}
+        <Route path="/setup" element={<SetupPage />} />
         {user ? (
           <Route element={<AppShell user={user} />}>
             <Route

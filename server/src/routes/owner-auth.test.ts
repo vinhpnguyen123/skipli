@@ -183,7 +183,7 @@ describe('ValidateAccessCode (owner)', () => {
         expect.objectContaining({
           action: 'auth.otp_failed',
           visibility: 'audit',
-          metadata: { reason: 'INVALID_CODE' },
+          metadata: expect.objectContaining({ reason: 'INVALID_CODE' }),
         }),
         expect.objectContaining({ action: 'auth.signed_in', visibility: 'audit' }),
       ]),

@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './env.js';
 import { errorHandler } from './lib/errors.js';
 import { authRouter } from './routes/auth.js';
+import { employeeRouter } from './routes/employee.js';
 import { employeesRouter } from './routes/employees.js';
 import { ownerRouter } from './routes/owner.js';
 
@@ -22,6 +23,7 @@ export function createApp() {
   });
   app.use('/api/owner', ownerRouter);
   app.use('/api/auth', authRouter);
+  app.use('/api/employee', employeeRouter);
   app.use('/api', employeesRouter);
 
   app.use(errorHandler);
