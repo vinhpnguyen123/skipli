@@ -8,11 +8,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly details: FieldIssue[];
-  constructor(status: number, code: string, message: string, details: FieldIssue[] = []) {
+  // The server's details as sent, for errors that carry data rather than field issues
+  // (e.g. a 409 VERSION_CONFLICT's latest task).
+  readonly data: unknown;
+  constructor(status: number, code: string, message: string, data?: unknown) {
     super(message);
     this.status = status;
     this.code = code;
-    this.details = details;
+    this.data = data;
+    this.details = Array.isArray(data) ? data : [];
   }
 }
 
@@ -61,7 +65,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       // Non-JSON errors (a proxy's HTML page, an old server without the route) have no message; HTTP/2
       // responses have no status text either. Fall back to something a user can report.
       body?.error?.message ?? `Request failed (${res.status})`,
-      Array.isArray(body?.error?.details) ? body.error.details : [],
+      body?.error?.details,
     );
   return body as T;
 }
@@ -107,3 +111,4 @@ const send =
     api<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 export const post = send('POST');
 export const patch = send('PATCH');
+export const del = send('DELETE');

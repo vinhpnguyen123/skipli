@@ -30,8 +30,11 @@ export function AppShell({ user }: { user: User }) {
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
           <span className="font-semibold text-slate-900">Skipli</span>
           <nav className="flex gap-1">
+            <NavLink to="/" end className={navClass}>
+              Tasks
+            </NavLink>
             {user.role === 'owner' && (
-              <NavLink to="/" end className={navClass}>
+              <NavLink to="/employees" className={navClass}>
                 Employees
               </NavLink>
             )}
