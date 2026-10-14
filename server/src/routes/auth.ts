@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { AppError } from '../lib/errors.js';
 import { rateLimit } from '../middleware/rate-limit.js';
-import { getUser, toPublicUser, type PublicUser } from '../services/auth.js';
+import { getActiveUser, toPublicUser, type PublicUser } from '../services/users.js';
 import {
   ACCESS_TOKEN_TTL_SEC,
   issueRefreshToken,
@@ -12,12 +12,13 @@ import {
 } from '../services/session.js';
 
 const COOKIE = 'rt';
-// Client and API are cross-site (Vercel / Render), so the cookie must be SameSite=None; Secure.
+// The browser reaches the API on the app's own origin (Vercel rewrites /api to Render; Vite proxies it in dev),
+// so the cookie is first-party and SameSite=Lax: other sites' requests don't carry it.
 // Path-scoped so it's only sent to the refresh/logout endpoints.
 const cookieOptions = {
   httpOnly: true,
   secure: true,
-  sameSite: 'none',
+  sameSite: 'lax',
   path: '/api/auth',
 } as const;
 
@@ -28,8 +29,8 @@ export async function startSession(res: Response, user: PublicUser) {
   return { accessToken: signAccessToken(user), expiresIn: ACCESS_TOKEN_TTL_SEC, user };
 }
 
-// SameSite=None means other sites' forms would carry the cookie too. A custom header forces a CORS
-// preflight, which only APP_URL passes, so a cross-site page can't rotate or revoke someone's session.
+// Defense in depth on top of SameSite=Lax: a custom header forces a CORS preflight, which only APP_URL passes,
+// so even a same-site page we don't control can't rotate or revoke someone's session.
 function requireAppHeader(req: Request) {
   if (req.get('X-Requested-With') !== 'skipli') throw new AppError('FORBIDDEN', 'Not allowed', 403);
 }
@@ -45,11 +46,8 @@ authRouter.post(
     if (typeof raw !== 'string' || !raw) throw new AppError('UNAUTHENTICATED', 'No session', 401);
     try {
       const rotated = await rotateRefreshToken(raw);
-      const snap = await getUser(rotated.userId);
       // Deleted or disabled since sign-in: the session ends here.
-      if (!snap || snap.data()?.status !== 'active')
-        throw new AppError('UNAUTHENTICATED', 'Account unavailable', 401);
-      const user = toPublicUser(snap);
+      const user = toPublicUser(await getActiveUser(rotated.userId));
       res.cookie(COOKIE, rotated.raw, { ...cookieOptions, maxAge: REFRESH_TOKEN_TTL_MS });
       res.json({ accessToken: signAccessToken(user), expiresIn: ACCESS_TOKEN_TTL_SEC, user });
     } catch (err) {

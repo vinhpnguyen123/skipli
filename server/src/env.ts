@@ -15,10 +15,15 @@ export const env = {
   REDIS_URL: required('REDIS_URL'),
   // Express 'trust proxy': a hop count (Render = 1) or an IP/CIDR list. req.ip, and so rate limits, depend on it.
   TRUST_PROXY: trustProxy(process.env.TRUST_PROXY ?? '1'),
+  // Shared with Vercel, which sends it on the /api rewrite. When set, /api only accepts requests carrying it.
+  ORIGIN_SECRET: process.env.ORIGIN_SECRET,
   // Optional: without them SMS sends fail (logged), and only demo accounts can sign in.
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
   TWILIO_FROM: process.env.TWILIO_FROM,
+  // Optional: without them invite emails fail (logged); in DEMO_MODE the owner still gets the invite link.
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  EMAIL_FROM: process.env.EMAIL_FROM,
 };
 
 function trustProxy(value: string): number | string {
