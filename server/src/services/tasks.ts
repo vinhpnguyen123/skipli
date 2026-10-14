@@ -11,6 +11,7 @@ import type { AuthUser } from '../middleware/auth.js';
 import type { CreateTaskInput, TaskStatus, UpdateTaskInput } from '../schemas/tasks.js';
 import type { ActivityEntry } from './activity.js';
 import { mutate, type Emit } from './mutate.js';
+import { addNotification, emailIfOffline, formatDue } from './notifications.js';
 import { users } from './users.js';
 
 export const tasks = db.collection('tasks');
@@ -89,7 +90,7 @@ export async function listTasks(viewer: AuthUser, assigneeId?: string): Promise<
 
 export async function createTask(actor: AuthUser, input: CreateTaskInput): Promise<Task> {
   const ref = tasks.doc();
-  return mutate(async (tx) => {
+  const task = await mutate(async (tx) => {
     await assertAssignable(tx, input.assigneeId);
     const now = Timestamp.now();
     const data = {
@@ -114,10 +115,30 @@ export async function createTask(actor: AuthUser, input: CreateTaskInput): Promi
       activity: taskActivity(actor, ref.id, task.title, 'task.created', {
         assigneeId: task.assigneeId,
       }),
-      emit: [{ to: roomsFor(task.assigneeId), event: 'task:created', data: task }],
+      emit: [
+        { to: roomsFor(task.assigneeId), event: 'task:created', data: task },
+        ...(task.assigneeId ? [notifyAssigned(tx, task, actor)] : []),
+      ],
     };
   });
+  if (task.assigneeId) void emailAssigned(task, actor);
+  return task;
 }
+
+// The assignee hears about a task given to them: in the app now, and by email if they have no tab open.
+const notifyAssigned = (tx: Transaction, task: Task, actor: AuthUser) =>
+  addNotification(tx, task.assigneeId!, 'task.assigned', {
+    taskId: task.id,
+    title: task.title,
+    by: actor.name,
+    dueDate: task.dueDate,
+  });
+
+const emailAssigned = (task: Task, actor: AuthUser) =>
+  emailIfOffline(task.assigneeId!, `New task: ${task.title}`, () => [
+    `${actor.name} assigned you "${task.title}".`,
+    ...(task.dueDate ? [`Due ${formatDue(task.dueDate)}.`] : []),
+  ]);
 
 // One entry per change, named for what matters most; reordering within a column is not logged.
 function describeChange(before: DocumentData, after: Task): string | null {
@@ -138,7 +159,7 @@ export async function updateTask(
   patch: UpdateTaskInput,
 ): Promise<Task> {
   const ref = tasks.doc(id);
-  return mutate(async (tx) => {
+  const { task, newlyAssigned } = await mutate(async (tx) => {
     const snap = await tx.get(ref);
     const before = snap.data();
     if (!before) throw notFound();
@@ -174,17 +195,21 @@ export async function updateTask(
     tx.update(ref, changes);
     const task = toTask(id, { ...before, ...changes });
     const action = describeChange(before, task);
+    const newlyAssigned = !!task.assigneeId && task.assigneeId !== before.assigneeId;
     return {
-      result: task,
+      result: { task, newlyAssigned },
       activity: action
         ? taskActivity(actor, id, task.title, action, { status: task.status })
         : undefined,
-      // The previous assignee hears about it too, so the task leaves their board.
       emit: [
+        // The previous assignee hears about it too, so the task leaves their board.
         { to: roomsFor(before.assigneeId, task.assigneeId), event: 'task:updated', data: task },
+        ...(newlyAssigned ? [notifyAssigned(tx, task, actor)] : []),
       ],
     };
   });
+  if (newlyAssigned) void emailAssigned(task, actor);
+  return task;
 }
 
 export async function deleteTask(actor: AuthUser, id: string): Promise<void> {

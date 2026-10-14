@@ -28,3 +28,12 @@ export type Task = {
   createdAt: string;
   updatedAt: string;
 };
+
+// Mirrors Notification in server/src/services/notifications.ts.
+export type AppNotification = {
+  id: string;
+  type: 'task.assigned' | 'task.due_soon' | 'task.overdue';
+  payload: { taskId: string; title: string; by?: string; dueDate?: string | null };
+  read: boolean;
+  createdAt: string;
+};

@@ -44,3 +44,10 @@ export function disconnectUser(userId: string): void {
 export function emitTo(rooms: string[], event: string, data: unknown): void {
   if (rooms.length) io?.to(rooms).emit(event, data);
 }
+
+// Whether the user has any open socket (any tab, any device). False in tests that build only the Express app.
+// ponytail: single server instance; with the phase 4 Redis adapter, fetchSockets() asks every instance.
+export async function isOnline(userId: string): Promise<boolean> {
+  if (!io) return false;
+  return (await io.in(`user:${userId}`).fetchSockets()).length > 0;
+}

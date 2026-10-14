@@ -11,11 +11,17 @@ export type TaskChanges = Partial<{
   title: string;
   description: string;
   assigneeId: string | null;
+  dueDate: string | null; // ISO UTC
   status: TaskStatus;
   order: number;
 }>;
 
-export type NewTask = { title: string; description: string; assigneeId: string | null };
+export type NewTask = {
+  title: string;
+  description: string;
+  assigneeId: string | null;
+  dueDate: string | null;
+};
 
 // Cache helpers. The board sorts by `order` when rendering, so the list itself is unordered.
 const write = (fn: (list: Task[]) => Task[]) =>

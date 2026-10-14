@@ -8,6 +8,8 @@ function required(name: string): string {
 export const env = {
   PORT: Number(process.env.PORT ?? 3000),
   APP_URL: process.env.APP_URL ?? 'http://localhost:5173',
+  // Business time zone for dates in emails and (phase 5) schedules.
+  BUSINESS_TZ: process.env.BUSINESS_TZ ?? 'America/New_York',
   DEMO_MODE: process.env.DEMO_MODE === 'true',
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? 'skipli-dev',
   JWT_ACCESS_SECRET: required('JWT_ACCESS_SECRET'),

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useLogout } from '../features/auth/session';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { socket } from '../lib/socket';
 import type { User } from '../lib/types';
 
@@ -52,6 +53,7 @@ export function AppShell({ user }: { user: User }) {
               />
               <span className="hidden sm:inline">{connected ? 'Live' : 'Offline'}</span>
             </span>
+            <NotificationBell />
             <span className="hidden text-sm text-slate-700 sm:inline">{user.name}</span>
             <button
               onClick={() => logout.mutate()}

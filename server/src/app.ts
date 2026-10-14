@@ -9,6 +9,7 @@ import { authRouter } from './routes/auth.js';
 import { employeeRouter } from './routes/employee.js';
 import { employeesRouter } from './routes/employees.js';
 import { meRouter } from './routes/me.js';
+import { notificationsRouter } from './routes/notifications.js';
 import { ownerRouter } from './routes/owner.js';
 import { tasksRouter } from './routes/tasks.js';
 
@@ -38,6 +39,7 @@ export function createApp() {
   app.use('/api', employeesRouter);
   app.use('/api', meRouter);
   app.use('/api', tasksRouter);
+  app.use('/api', notificationsRouter);
 
   app.use(errorHandler);
   return app;

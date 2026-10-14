@@ -3,6 +3,7 @@ import { button, input } from '../../components/ui';
 import { fieldErrors } from '../../lib/api';
 import type { Task, TaskStatus, User } from '../../lib/types';
 import { COLUMNS } from './columns';
+import { fromLocalInput, toLocalInput } from './due';
 import { isConflict, useCreateTask, useDeleteTask, useUpdateTask } from './hooks';
 
 type Props = {
@@ -12,7 +13,7 @@ type Props = {
   onCancel: () => void;
 };
 
-const FIELDS = ['title', 'description', 'assigneeId'] as const;
+const FIELDS = ['title', 'description', 'assigneeId', 'dueDate'] as const;
 
 // Owner only: create, edit, reassign, move, delete.
 export function TaskForm({ task, employees, onDone, onCancel }: Props) {
@@ -20,6 +21,7 @@ export function TaskForm({ task, employees, onDone, onCancel }: Props) {
     title: task?.title ?? '',
     description: task?.description ?? '',
     assigneeId: task?.assigneeId ?? '',
+    dueDate: toLocalInput(task?.dueDate ?? null),
     status: task?.status ?? ('todo' as TaskStatus),
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -44,6 +46,7 @@ export function TaskForm({ task, employees, onDone, onCancel }: Props) {
       title: values.title.trim(),
       description: values.description.trim(),
       assigneeId: values.assigneeId || null,
+      dueDate: fromLocalInput(values.dueDate),
     };
     if (!task) {
       create.mutate(fields, { onSuccess: (t) => onDone(`Created "${t.title}".`) });
@@ -86,6 +89,30 @@ export function TaskForm({ task, employees, onDone, onCancel }: Props) {
           onChange={set('description')}
           className={input}
         />
+      </label>
+      <label className="block">
+        <span className="text-sm font-medium text-slate-700">Due (optional)</span>
+        <span className="mt-1 flex gap-2">
+          <input
+            type="datetime-local"
+            value={values.dueDate}
+            onChange={set('dueDate')}
+            aria-invalid={!!errors.dueDate}
+            className={`${input} mt-0`}
+          />
+          {values.dueDate && (
+            <button
+              type="button"
+              onClick={() => setValues((v) => ({ ...v, dueDate: '' }))}
+              className={`${button.secondary} shrink-0`}
+            >
+              Clear
+            </button>
+          )}
+        </span>
+        {errors.dueDate && (
+          <span className="mt-1 block text-xs text-red-600">{errors.dueDate}</span>
+        )}
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">

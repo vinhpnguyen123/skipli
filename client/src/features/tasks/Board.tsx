@@ -11,6 +11,7 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -25,13 +26,43 @@ import { orderBetween } from './order';
 
 const COLUMN_PREFIX = 'column:';
 
+// Keyboard dragging. dnd-kit's sortableKeyboardCoordinates is built for a single list: for Left/Right it picks
+// any target whose left edge is further right, which can be a card in the same column. Here Left/Right jump to
+// the neighbouring column (found by which column box holds the card's centre, so it also works when the
+// columns are stacked on a phone); Up/Down keep the built-in reordering within a column.
+const keyboardCoordinates: KeyboardCoordinateGetter = (event, args) => {
+  if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') {
+    return sortableKeyboardCoordinates(event, args);
+  }
+  event.preventDefault();
+  const { collisionRect, droppableRects } = args.context;
+  if (!collisionRect) return;
+  const rects = COLUMNS.map(({ status }) => droppableRects.get(`${COLUMN_PREFIX}${status}`));
+  const x = collisionRect.left + collisionRect.width / 2;
+  const y = collisionRect.top + collisionRect.height / 2;
+  const current = rects.findIndex(
+    (r) => r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom,
+  );
+  const target = rects[current + (event.code === 'ArrowRight' ? 1 : -1)];
+  if (current < 0 || !target) return args.currentCoordinates; // already in the first/last column
+  return { x: target.left + (target.width - collisionRect.width) / 2, y: target.top };
+};
+
+export type SortBy = 'manual' | 'due';
+
 type Props = {
   tasks: Task[];
+  // 'due': soonest due first (no date last), and dragging only changes the column.
+  sortBy: SortBy;
   onMove: (task: Task, changes: { status: TaskStatus; order: number }) => void;
   renderCard: (task: Task, dragging: boolean) => ReactNode;
 };
 
-export function Board({ tasks, onMove, renderCard }: Props) {
+const byOrder = (a: Task, b: Task) => a.order - b.order;
+const byDue = (a: Task, b: Task) =>
+  (a.dueDate ?? '\uffff').localeCompare(b.dueDate ?? '\uffff') || byOrder(a, b);
+
+export function Board({ tasks, sortBy, onMove, renderCard }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overStatus, setOverStatus] = useState<TaskStatus | null>(null);
 
@@ -39,15 +70,15 @@ export function Board({ tasks, onMove, renderCard }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(KeyboardSensor, { coordinateGetter: keyboardCoordinates }),
   );
 
   const columns = useMemo(() => {
     const byStatus: Record<TaskStatus, Task[]> = { todo: [], in_progress: [], done: [] };
     for (const t of tasks) byStatus[t.status].push(t);
-    for (const list of Object.values(byStatus)) list.sort((a, b) => a.order - b.order);
+    for (const list of Object.values(byStatus)) list.sort(sortBy === 'due' ? byDue : byOrder);
     return byStatus;
-  }, [tasks]);
+  }, [tasks, sortBy]);
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const active = activeId ? byId.get(activeId) : undefined;
 
@@ -75,6 +106,13 @@ export function Board({ tasks, onMove, renderCard }: Props) {
 
     const column = columns[status];
     const others = column.filter((t) => t.id !== task.id);
+    if (sortBy === 'due') {
+      // The due date decides the order on screen; a move between columns lands at the bottom of the
+      // manual order, so switching back to manual sorting shows it last.
+      if (status === task.status) return;
+      const last = others.length ? Math.max(...others.map((t) => t.order)) : undefined;
+      return onMove(task, { status, order: orderBetween(last, undefined) });
+    }
     let index: number;
     if (overId.startsWith(COLUMN_PREFIX)) {
       index = others.length; // empty space: to the bottom
@@ -128,7 +166,7 @@ export function Board({ tasks, onMove, renderCard }: Props) {
         ))}
       </div>
       <DragOverlay>
-        {active ? <div className="rotate-1 shadow-lg">{renderCard(active, false)}</div> : null}
+        {active ? <div className="shadow-lg">{renderCard(active, false)}</div> : null}
       </DragOverlay>
     </DndContext>
   );

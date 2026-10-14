@@ -1,8 +1,16 @@
 import type { Task, User } from '../../lib/types';
+import { dueState, formatDue } from './due';
+
+const DUE_BADGE = {
+  overdue: { label: 'Overdue', className: 'bg-red-50 text-red-700 ring-red-200' },
+  soon: { label: 'Due soon', className: 'bg-amber-50 text-amber-800 ring-amber-200' },
+  later: { label: 'Due', className: 'bg-slate-50 text-slate-600 ring-slate-200' },
+};
 
 type Props = {
   task: Task;
   viewer: User;
+  now: number; // shared clock, so badges flip on time
   assigneeName?: string; // owner's board only
   employees?: User[]; // owner's board: quick-assign for unassigned tasks
   onOpen: () => void;
@@ -19,6 +27,7 @@ const stop = {
 export function TaskCard({
   task,
   viewer,
+  now,
   assigneeName,
   employees,
   onOpen,
@@ -27,6 +36,7 @@ export function TaskCard({
 }: Props) {
   const isOwner = viewer.role === 'owner';
   const done = task.status === 'done';
+  const due = dueState(task, now);
 
   return (
     <article className="rounded-lg bg-white p-3 shadow-sm ring-1 ring-slate-200">
@@ -39,6 +49,13 @@ export function TaskCard({
       </button>
       {task.description && (
         <p className="mt-1 line-clamp-2 text-xs text-slate-500">{task.description}</p>
+      )}
+      {due && (
+        <p
+          className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${DUE_BADGE[due].className}`}
+        >
+          {DUE_BADGE[due].label} · <time dateTime={task.dueDate!}>{formatDue(task.dueDate!)}</time>
+        </p>
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { NoticeBanner } from '../components/Notice';
 import { useNotice } from '../components/useNotice';
-import { button, input } from '../components/ui';
+import { button, toolbarSelect } from '../components/ui';
 import { useEmployees } from '../features/employees/hooks';
-import { Board } from '../features/tasks/Board';
+import { Board, type SortBy } from '../features/tasks/Board';
 import { COLUMNS } from '../features/tasks/columns';
+import { dueState, formatDue, useNow } from '../features/tasks/due';
 import { TaskCard } from '../features/tasks/TaskCard';
 import { TaskForm } from '../features/tasks/TaskForm';
 import {
@@ -27,6 +29,11 @@ export default function TasksPage({ user }: { user: User }) {
   const [notice, setNotice] = useNotice();
   const [filter, setFilter] = useState('all'); // 'all' | 'none' | employee id
   const [modal, setModal] = useState<Modal | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>('manual');
+  // Notification links open a task: /?task=<id>.
+  const [params, setParams] = useSearchParams();
+  const linkedTaskId = params.get('task');
+  const now = useNow();
   useTaskEvents(user);
 
   const staff = useMemo(() => employees.data ?? [], [employees.data]);
@@ -37,8 +44,12 @@ export default function TasksPage({ user }: { user: User }) {
       ? all
       : all.filter((t) => (filter === 'none' ? !t.assigneeId : t.assigneeId === filter));
   // Looked up live, so an open dialog reflects socket updates and closes if the task is deleted.
-  const openTask = modal?.kind === 'open' ? all.find((t) => t.id === modal.taskId) : undefined;
-  const close = () => setModal(null);
+  const openId = modal?.kind === 'open' ? modal.taskId : modal ? undefined : linkedTaskId;
+  const openTask = openId ? all.find((t) => t.id === openId) : undefined;
+  const close = () => {
+    setModal(null);
+    if (linkedTaskId) setParams({}, { replace: true });
+  };
 
   const change = (task: Task, changes: TaskChanges, success?: string) =>
     update.mutate(
@@ -58,6 +69,7 @@ export default function TasksPage({ user }: { user: User }) {
     );
 
   const unassignedCount = all.filter((t) => !t.assigneeId).length;
+  const overdueCount = all.filter((t) => dueState(t, now) === 'overdue').length;
 
   return (
     <div>
@@ -71,16 +83,28 @@ export default function TasksPage({ user }: { user: User }) {
               {all.filter((t) => t.status !== 'done').length} open ·{' '}
               {all.filter((t) => t.status === 'done').length} done
               {isOwner && unassignedCount > 0 && ` · ${unassignedCount} unassigned`}
+              {overdueCount > 0 && (
+                <span className="font-medium text-red-700"> · {overdueCount} overdue</span>
+              )}
             </p>
           )}
         </div>
-        {isOwner && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            aria-label="Sort cards by"
+            className={toolbarSelect}
+          >
+            <option value="manual">Manual order</option>
+            <option value="due">Due date</option>
+          </select>
+          {isOwner && (
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               aria-label="Show tasks for"
-              className={`${input} mt-0 w-auto`}
+              className={toolbarSelect}
             >
               <option value="all">Everyone</option>
               <option value="none">Unassigned</option>
@@ -90,11 +114,13 @@ export default function TasksPage({ user }: { user: User }) {
                 </option>
               ))}
             </select>
+          )}
+          {isOwner && (
             <button onClick={() => setModal({ kind: 'new' })} className={button.primary}>
               New task
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <NoticeBanner notice={notice} onDismiss={() => setNotice(null)} />
@@ -131,11 +157,13 @@ export default function TasksPage({ user }: { user: User }) {
         ) : (
           <Board
             tasks={shown}
+            sortBy={sortBy}
             onMove={(task, changes) => change(task, changes)}
             renderCard={(task) => (
               <TaskCard
                 task={task}
                 viewer={user}
+                now={now}
                 assigneeName={task.assigneeId ? names.get(task.assigneeId) : undefined}
                 employees={staff}
                 onOpen={() => setModal({ kind: 'open', taskId: task.id })}
@@ -206,6 +234,11 @@ function EmployeeTaskView({
       <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">
         {task.description || 'No description.'}
       </p>
+      {task.dueDate && (
+        <p className="mt-3 text-sm text-slate-700">
+          Due <time dateTime={task.dueDate}>{formatDue(task.dueDate)}</time>
+        </p>
+      )}
       <fieldset className="mt-6">
         <legend className="text-sm font-medium text-slate-700">Status</legend>
         <div className="mt-2 grid grid-cols-3 gap-2">
