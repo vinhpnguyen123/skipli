@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent, type InputHTMLAttributes } from 'react';
-import { ApiError } from '../../lib/api';
+import { fieldErrors } from '../../lib/api';
 import type { User } from '../../lib/types';
 import { button, input } from '../../components/ui';
 import { useCreateEmployee, useUpdateEmployee, type InviteResult } from './hooks';
@@ -14,19 +14,6 @@ type Props = {
 const FIELDS = ['name', 'email', 'phone', 'department', 'title'] as const;
 type Field = (typeof FIELDS)[number];
 
-// Server errors carry the field in details[].path; show them under that input.
-function fieldErrors(err: unknown): Partial<Record<Field, string>> {
-  if (!(err instanceof ApiError)) return {};
-  const out: Partial<Record<Field, string>> = {};
-  for (const d of err.details) {
-    if ((FIELDS as readonly string[]).includes(d.path)) {
-      out[d.path as Field] =
-        err.code === 'CONFLICT' ? 'Already in use by another account' : (d.message ?? 'Invalid');
-    }
-  }
-  return out;
-}
-
 export function EmployeeForm({ employee, departments, onCancel, onSaved }: Props) {
   const id = useId();
   const [values, setValues] = useState({
@@ -39,7 +26,7 @@ export function EmployeeForm({ employee, departments, onCancel, onSaved }: Props
   const create = useCreateEmployee();
   const update = useUpdateEmployee();
   const mutation = employee ? update : create;
-  const errors = fieldErrors(mutation.error);
+  const errors = fieldErrors(mutation.error, FIELDS);
   const generalError =
     mutation.error && !Object.keys(errors).length ? mutation.error.message : null;
 

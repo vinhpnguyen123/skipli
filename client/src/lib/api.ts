@@ -19,6 +19,22 @@ export class ApiError extends Error {
   }
 }
 
+// Maps a server error's details[].path to a message per form field, for showing under each input.
+export function fieldErrors<F extends string>(
+  err: unknown,
+  fields: readonly F[],
+): Partial<Record<F, string>> {
+  if (!(err instanceof ApiError)) return {};
+  const out: Partial<Record<F, string>> = {};
+  for (const d of err.details) {
+    if ((fields as readonly string[]).includes(d.path)) {
+      out[d.path as F] =
+        err.code === 'CONFLICT' ? 'Already in use by another account' : (d.message ?? 'Invalid');
+    }
+  }
+  return out;
+}
+
 // Memory only. After a reload the refresh cookie restores it (see refreshSession).
 let accessToken: string | null = null;
 export const getAccessToken = () => accessToken;

@@ -7,6 +7,7 @@ export type User = {
   phone: string | null;
   department: string;
   title: string;
+  username: string | null;
   status: 'invited' | 'active' | 'disabled';
 };
 

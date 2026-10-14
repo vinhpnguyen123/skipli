@@ -35,6 +35,9 @@ export function AppShell({ user }: { user: User }) {
                 Employees
               </NavLink>
             )}
+            <NavLink to="/profile" className={navClass}>
+              Profile
+            </NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-4">
             <span

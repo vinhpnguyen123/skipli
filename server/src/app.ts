@@ -7,6 +7,7 @@ import { errorHandler } from './lib/errors.js';
 import { authRouter } from './routes/auth.js';
 import { employeeRouter } from './routes/employee.js';
 import { employeesRouter } from './routes/employees.js';
+import { meRouter } from './routes/me.js';
 import { ownerRouter } from './routes/owner.js';
 
 export function createApp() {
@@ -25,6 +26,7 @@ export function createApp() {
   app.use('/api/auth', authRouter);
   app.use('/api/employee', employeeRouter);
   app.use('/api', employeesRouter);
+  app.use('/api', meRouter);
 
   app.use(errorHandler);
   return app;

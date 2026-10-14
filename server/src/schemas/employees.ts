@@ -29,3 +29,12 @@ export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 
 export const employeeIdBody = z.object({ employeeId }).strict();
 export const employeeIdParams = z.object({ id: employeeId }).strict();
+
+// Self-service: contact details only. Role, department, title, username and status are set by the owner
+// (or by onboarding), and .strict() rejects them here.
+export const updateProfileSchema = z
+  .object({ name: fields.name, email, phone: phoneNumber.nullable() })
+  .partial()
+  .strict()
+  .refine((o) => Object.keys(o).length > 0, 'Nothing to update');
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

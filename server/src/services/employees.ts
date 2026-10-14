@@ -1,4 +1,9 @@
-import { FieldValue, type DocumentReference, type Transaction } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  type DocumentData,
+  type DocumentReference,
+  type Transaction,
+} from 'firebase-admin/firestore';
 import { env } from '../env.js';
 import { escapeHtml, sendEmail } from '../lib/email.js';
 import { AppError } from '../lib/errors.js';
@@ -120,6 +125,31 @@ export async function listEmployees(): Promise<PublicUser[]> {
   return snap.docs.map(toPublicUser).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Writes a user update, moving email/phone reservations when those change. Runs inside the caller's
+// transaction after its reads. Shared by the owner's edit and the self-service profile edit.
+export async function applyUserUpdate(
+  tx: Transaction,
+  ref: DocumentReference,
+  current: DocumentData,
+  patch: { email?: string; phone?: string | null } & Record<string, unknown>,
+): Promise<void> {
+  const changes: [UniqueField, string | null, string | null][] = [];
+  if (patch.email !== undefined && patch.email !== current.email)
+    changes.push(['email', current.email, patch.email]);
+  if (patch.phone !== undefined && patch.phone !== current.phone)
+    changes.push(['phone', current.phone ?? null, patch.phone]);
+  await assertAvailable(
+    tx,
+    changes.filter(([, , next]) => next !== null).map(([field, , next]) => [field, next!]),
+  );
+
+  for (const [field, prev, next] of changes) {
+    if (prev) tx.delete(uniqueRef(field, prev));
+    if (next) tx.create(uniqueRef(field, next), { userId: ref.id });
+  }
+  tx.update(ref, { ...patch, updatedAt: FieldValue.serverTimestamp() });
+}
+
 export async function updateEmployee(
   actor: AuthUser,
   id: string,
@@ -128,21 +158,7 @@ export async function updateEmployee(
   const ref = users.doc(id);
   await db.runTransaction(async (tx) => {
     const current = (await getEmployeeDoc(tx, ref)).data()!;
-    const changes: [UniqueField, string | null, string | null][] = [];
-    if (patch.email !== undefined && patch.email !== current.email)
-      changes.push(['email', current.email, patch.email]);
-    if (patch.phone !== undefined && patch.phone !== current.phone)
-      changes.push(['phone', current.phone ?? null, patch.phone]);
-    await assertAvailable(
-      tx,
-      changes.filter(([, , next]) => next !== null).map(([field, , next]) => [field, next!]),
-    );
-
-    for (const [field, prev, next] of changes) {
-      if (prev) tx.delete(uniqueRef(field, prev));
-      if (next) tx.create(uniqueRef(field, next), { userId: id });
-    }
-    tx.update(ref, { ...patch, updatedAt: FieldValue.serverTimestamp() });
+    await applyUserUpdate(tx, ref, current, patch);
     recordActivity(tx, {
       actorId: actor.id,
       actorName: actor.name,
@@ -158,9 +174,9 @@ export async function updateEmployee(
 }
 
 // Hard delete: the user doc, their email/phone/username, and everything that could still let them in (refresh
-// tokens, setup links, a pending
-// email code) go in one transaction, then their open sockets are dropped. requireAuth re-checks the account, so
-// an access token they still hold stops working immediately. The activity entry keeps a copy of the name.
+// tokens, setup links, a pending email code) go in one transaction, then their open sockets are dropped.
+// requireAuth re-checks the account, so an access token they still hold stops working immediately. The activity
+// entry keeps a copy of the name.
 // Phase 3: unassign their open tasks in this same transaction.
 export async function deleteEmployee(actor: AuthUser, id: string): Promise<void> {
   const ref = users.doc(id);
