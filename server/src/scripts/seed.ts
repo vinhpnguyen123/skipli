@@ -55,6 +55,11 @@ async function seed() {
   };
 
   const batch = db.batch();
+  // Same reservations the API makes (services/employees.ts), so seeded emails/phones can't be reused.
+  for (const { id, email, phone } of [owner, demoOwner, ...employees]) {
+    batch.set(db.collection('uniques').doc(`email:${email}`), { userId: id });
+    batch.set(db.collection('uniques').doc(`phone:${phone}`), { userId: id });
+  }
   for (const { id, ...doc } of [owner, demoOwner]) {
     batch.set(db.collection('users').doc(id), { ...base, ...doc });
   }

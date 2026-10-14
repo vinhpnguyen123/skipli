@@ -4,13 +4,18 @@ import type { SessionResponse, User } from './types';
 // Empty in dev: vite proxies /api to localhost:3000. In production it is the Render URL.
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
+// details: per-field problems from the server, e.g. [{ path: 'email', message: '…' }] (400) or [{ path: 'email' }] (409).
+export type FieldIssue = { path: string; message?: string };
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  constructor(status: number, code: string, message: string) {
+  readonly details: FieldIssue[];
+  constructor(status: number, code: string, message: string, details: FieldIssue[] = []) {
     super(message);
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -39,6 +44,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       res.status,
       body?.error?.code ?? 'INTERNAL',
       body?.error?.message ?? res.statusText,
+      Array.isArray(body?.error?.details) ? body.error.details : [],
     );
   return body as T;
 }
@@ -78,5 +84,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
-export const post = <T>(path: string, body?: unknown) =>
-  api<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });
+const send =
+  (method: string) =>
+  <T>(path: string, body?: unknown) =>
+    api<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+export const post = send('POST');
+export const patch = send('PATCH');

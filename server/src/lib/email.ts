@@ -11,7 +11,11 @@ export async function sendEmail({ to, subject, text, html }: Email): Promise<voi
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from, to, subject, text, html }),
   });
-  if (!res.ok) throw new Error(`Resend responded ${res.status}`);
+  if (!res.ok) {
+    // Resend explains rejections (unverified domain, test-sender limits); keep that in the log.
+    const detail = ((await res.json().catch(() => null)) as { message?: string } | null)?.message;
+    throw new Error(`Resend responded ${res.status}${detail ? `: ${detail}` : ''}`);
+  }
 }
 
 // For user-supplied values (names) placed in email HTML.
