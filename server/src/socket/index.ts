@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
 import { env } from '../env.js';
 import { authenticate, type AuthUser } from '../middleware/auth.js';
+import { registerChatHandlers } from './chat.js';
 
 // Set once at startup. Undefined in tests that build only the Express app, so the helpers below no-op there.
 let io: Server | undefined;
@@ -28,6 +29,7 @@ export function initSocket(httpServer: HttpServer): Server {
     const user = socket.data.user as AuthUser;
     void socket.join(user.role === 'owner' ? [`user:${user.id}`, 'owner'] : `user:${user.id}`);
     socket.on('ping:check', (cb?: (v: string) => void) => cb?.('pong'));
+    registerChatHandlers(socket, user);
   });
 
   return io;

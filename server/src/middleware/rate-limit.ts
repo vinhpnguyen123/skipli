@@ -37,34 +37,59 @@ async function hitRedis(key: string, windowSec: number): Promise<{ count: number
   return { count: results[0][1] as number, ttl: results[2][1] as number };
 }
 
+type Limit = Pick<Options, 'name' | 'limit' | 'windowSec' | 'onRedisDown'> & {
+  by: 'ip' | 'target' | 'user';
+  subject: string;
+};
+
 // Fixed-window counter: INCR + EXPIRE NX in one MULTI, so the window starts at the first hit and the
 // key can't be left without a TTL. ponytail: fixed window allows up to 2x limit across a window edge;
 // switch to a sliding window if that ever matters.
+// Counts one hit and throws RATE_LIMITED (with retryAfter in seconds) once over the limit. Shared by the HTTP
+// middleware below and socket handlers.
+export async function consume({
+  name,
+  limit,
+  windowSec,
+  by,
+  subject,
+  onRedisDown = 'open',
+}: Limit) {
+  // Hash the subject so Redis never holds raw phone numbers, emails or ids.
+  const key = `rl:${by}:${name}:${createHash('sha256').update(subject).digest('hex')}`;
+
+  let hit: { count: number; ttl: number };
+  try {
+    hit = await hitRedis(key, windowSec);
+  } catch (err) {
+    const reason = (err as Error).message;
+    if (onRedisDown === 'open') {
+      // OTP attempts are still capped per code in Firestore; this only drops the request-volume limit.
+      console.warn(`rate limit '${name}' skipped, redis unavailable: ${reason}`);
+      return;
+    }
+    console.warn(`rate limit '${name}' using in-memory fallback, redis unavailable: ${reason}`);
+    hit = hitMemory(key, windowSec);
+  }
+
+  if (hit.count > limit) {
+    throw new AppError('RATE_LIMITED', 'Too many requests, try again later', 429, {
+      retryAfter: Math.max(hit.ttl, 1),
+    });
+  }
+}
+
 export const rateLimit =
-  ({ name, limit, windowSec, by, target, onRedisDown = 'open' }: Options): RequestHandler =>
+  ({ name, limit, windowSec, by, target, onRedisDown }: Options): RequestHandler =>
   async (req, res, next) => {
     const subject = by === 'ip' ? req.ip : target?.(req);
     if (!subject) return next();
-    // Hash the subject so Redis never holds raw phone numbers or emails.
-    const key = `rl:${by}:${name}:${createHash('sha256').update(subject).digest('hex')}`;
-
-    let hit: { count: number; ttl: number };
     try {
-      hit = await hitRedis(key, windowSec);
+      await consume({ name, limit, windowSec, by, subject, onRedisDown });
     } catch (err) {
-      const reason = (err as Error).message;
-      if (onRedisDown === 'open') {
-        // OTP attempts are still capped per code in Firestore; this only drops the request-volume limit.
-        console.warn(`rate limit '${name}' skipped, redis unavailable: ${reason}`);
-        return next();
-      }
-      console.warn(`rate limit '${name}' using in-memory fallback, redis unavailable: ${reason}`);
-      hit = hitMemory(key, windowSec);
-    }
-
-    if (hit.count > limit) {
-      res.setHeader('Retry-After', String(Math.max(hit.ttl, 1)));
-      throw new AppError('RATE_LIMITED', 'Too many requests, try again later', 429);
+      const retryAfter = (err as AppError).details as { retryAfter?: number } | undefined;
+      if (retryAfter?.retryAfter) res.setHeader('Retry-After', String(retryAfter.retryAfter));
+      throw err;
     }
     next();
   };
