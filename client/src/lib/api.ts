@@ -58,7 +58,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(
       res.status,
       body?.error?.code ?? 'INTERNAL',
-      body?.error?.message ?? res.statusText,
+      // Non-JSON errors (a proxy's HTML page, an old server without the route) have no message; HTTP/2
+      // responses have no status text either. Fall back to something a user can report.
+      body?.error?.message ?? `Request failed (${res.status})`,
       Array.isArray(body?.error?.details) ? body.error.details : [],
     );
   return body as T;
