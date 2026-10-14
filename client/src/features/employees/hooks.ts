@@ -17,10 +17,12 @@ export type InviteResult = { inviteSent: boolean; setupUrl?: string };
 const KEY = ['employees'];
 const refresh = () => queryClient.invalidateQueries({ queryKey: KEY });
 
-export function useEmployees() {
+// Owner only; pass enabled=false for employees, who may not list staff.
+export function useEmployees(enabled = true) {
   return useQuery({
     queryKey: KEY,
     queryFn: async () => (await api<{ employees: User[] }>('/employees')).employees,
+    enabled,
   });
 }
 

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog } from '../components/Dialog';
+import { NoticeBanner } from '../components/Notice';
+import { useNotice } from '../components/useNotice';
 import { button, input } from '../components/ui';
 import { EmployeeForm } from '../features/employees/EmployeeForm';
 import {
@@ -10,7 +12,6 @@ import {
 } from '../features/employees/hooks';
 import type { User } from '../lib/types';
 
-type Notice = { tone: 'ok' | 'warn' | 'error'; text: string };
 type Modal =
   | { kind: 'add' }
   | { kind: 'edit'; employee: User }
@@ -32,15 +33,8 @@ export default function EmployeesPage() {
   const resend = useResendInvite();
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState<Modal | null>(null);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useNotice();
   const close = () => setModal(null);
-
-  // Notices fade after a few seconds; errors stay until dismissed.
-  useEffect(() => {
-    if (!notice || notice.tone === 'error') return;
-    const t = setTimeout(() => setNotice(null), 6000);
-    return () => clearTimeout(t);
-  }, [notice]);
 
   const data = employees.data;
   const list = data ?? [];
@@ -95,27 +89,7 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {notice && (
-        <div
-          role="status"
-          className={`mt-4 flex items-start justify-between gap-3 rounded-lg px-4 py-3 text-sm ${
-            {
-              ok: 'bg-emerald-50 text-emerald-800',
-              warn: 'bg-amber-50 text-amber-800',
-              error: 'bg-red-50 text-red-700',
-            }[notice.tone]
-          }`}
-        >
-          <span>{notice.text}</span>
-          <button
-            onClick={() => setNotice(null)}
-            aria-label="Dismiss"
-            className="opacity-60 hover:opacity-100"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+      <NoticeBanner notice={notice} onDismiss={() => setNotice(null)} />
 
       {list.length > 0 && (
         <input

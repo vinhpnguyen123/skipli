@@ -6,10 +6,13 @@ import { env } from './env.js';
 import { errorHandler } from './lib/errors.js';
 import { requireVercelOrigin } from './middleware/origin.js';
 import { authRouter } from './routes/auth.js';
+import { cronRouter } from './routes/cron.js';
 import { employeeRouter } from './routes/employee.js';
 import { employeesRouter } from './routes/employees.js';
 import { meRouter } from './routes/me.js';
+import { notificationsRouter } from './routes/notifications.js';
 import { ownerRouter } from './routes/owner.js';
+import { tasksRouter } from './routes/tasks.js';
 
 export function createApp() {
   const app = express();
@@ -36,6 +39,9 @@ export function createApp() {
   app.use('/api/employee', employeeRouter);
   app.use('/api', employeesRouter);
   app.use('/api', meRouter);
+  app.use('/api', tasksRouter);
+  app.use('/api', notificationsRouter);
+  app.use('/api/cron', cronRouter);
 
   app.use(errorHandler);
   return app;

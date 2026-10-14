@@ -1,9 +1,8 @@
 import { AppError } from '../lib/errors.js';
-import { db } from '../lib/firebase.js';
 import type { AuthUser } from '../middleware/auth.js';
 import type { UpdateProfileInput } from '../schemas/employees.js';
-import { recordActivity } from './activity.js';
 import { applyUserUpdate } from './employees.js';
+import { mutate } from './mutate.js';
 import { getActiveUser, getUser, toPublicUser, users, type PublicUser } from './users.js';
 
 export async function getProfile(user: AuthUser): Promise<PublicUser> {
@@ -18,7 +17,7 @@ export async function updateProfile(
   patch: UpdateProfileInput,
 ): Promise<PublicUser> {
   const ref = users.doc(user.id);
-  await db.runTransaction(async (tx) => {
+  await mutate(async (tx) => {
     const snap = await tx.get(ref);
     const current = snap.data();
     if (current?.status !== 'active')
@@ -30,16 +29,19 @@ export async function updateProfile(
       ]);
     }
     await applyUserUpdate(tx, ref, current, patch);
-    recordActivity(tx, {
-      actorId: user.id,
-      actorName: patch.name ?? current.name,
-      action: 'profile.updated',
-      targetType: 'user',
-      targetId: user.id,
-      targetName: patch.name ?? current.name,
-      visibility: 'feed',
-      metadata: { fields: Object.keys(patch) },
-    });
+    return {
+      result: undefined,
+      activity: {
+        actorId: user.id,
+        actorName: patch.name ?? current.name,
+        action: 'profile.updated',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: patch.name ?? current.name,
+        visibility: 'feed',
+        metadata: { fields: Object.keys(patch) },
+      },
+    };
   });
   return toPublicUser((await getUser(user.id))!);
 }

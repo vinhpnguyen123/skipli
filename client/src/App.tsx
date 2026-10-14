@@ -7,6 +7,7 @@ import EmployeesPage from './pages/EmployeesPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import SetupPage from './pages/SetupPage';
+import TasksPage from './pages/TasksPage';
 
 export default function App() {
   const session = useSession();
@@ -32,13 +33,8 @@ export default function App() {
         <Route path="/setup" element={<SetupPage />} />
         {user ? (
           <Route element={<AppShell user={user} />}>
-            {/* Employees land on their profile until tasks arrive in phase 3. */}
-            <Route
-              index
-              element={
-                user.role === 'owner' ? <EmployeesPage /> : <Navigate to="/profile" replace />
-              }
-            />
+            <Route index element={<TasksPage user={user} />} />
+            {user.role === 'owner' && <Route path="employees" element={<EmployeesPage />} />}
             <Route path="profile" element={<ProfilePage />} />
           </Route>
         ) : (

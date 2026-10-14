@@ -12,9 +12,10 @@ import type { AuthUser } from '../middleware/auth.js';
 import type { CreateEmployeeInput, UpdateEmployeeInput } from '../schemas/employees.js';
 import { disconnectUser } from '../socket/index.js';
 import { codeRef } from './access-code.js';
-import { recordActivity } from './activity.js';
+import { mutate } from './mutate.js';
 import { assertCanAccess } from './authz.js';
 import { issueSetupToken, setupTokens, setupUrl } from './setup-token.js';
+import { readOpenTasks, unassignTasks } from './tasks.js';
 import {
   getUser,
   toPublicUser,
@@ -73,7 +74,7 @@ async function sendInvite(
 
 export async function createEmployee(actor: AuthUser, input: CreateEmployeeInput) {
   const ref = users.doc();
-  const raw = await db.runTransaction(async (tx) => {
+  const raw = await mutate(async (tx) => {
     await assertAvailable(tx, [
       ['email', input.email],
       ...(input.phone ? [['phone', input.phone] as [UniqueField, string]] : []),
@@ -97,16 +98,18 @@ export async function createEmployee(actor: AuthUser, input: CreateEmployeeInput
     });
     tx.create(uniqueRef('email', input.email), { userId: ref.id });
     if (input.phone) tx.create(uniqueRef('phone', input.phone), { userId: ref.id });
-    recordActivity(tx, {
-      actorId: actor.id,
-      actorName: actor.name,
-      action: 'employee.created',
-      targetType: 'user',
-      targetId: ref.id,
-      targetName: input.name,
-      visibility: 'feed',
-    });
-    return issueSetupToken(tx, ref.id);
+    return {
+      result: issueSetupToken(tx, ref.id),
+      activity: {
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'employee.created',
+        targetType: 'user',
+        targetId: ref.id,
+        targetName: input.name,
+        visibility: 'feed',
+      },
+    };
   });
   const invite = await sendInvite({ id: ref.id, ...input }, actor.name, raw);
   return { employeeId: ref.id, ...invite };
@@ -156,19 +159,22 @@ export async function updateEmployee(
   patch: UpdateEmployeeInput,
 ): Promise<PublicUser> {
   const ref = users.doc(id);
-  await db.runTransaction(async (tx) => {
+  await mutate(async (tx) => {
     const current = (await getEmployeeDoc(tx, ref)).data()!;
     await applyUserUpdate(tx, ref, current, patch);
-    recordActivity(tx, {
-      actorId: actor.id,
-      actorName: actor.name,
-      action: 'employee.updated',
-      targetType: 'user',
-      targetId: id,
-      targetName: patch.name ?? current.name,
-      visibility: 'feed',
-      metadata: { fields: Object.keys(patch) },
-    });
+    return {
+      result: undefined,
+      activity: {
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'employee.updated',
+        targetType: 'user',
+        targetId: id,
+        targetName: patch.name ?? current.name,
+        visibility: 'feed',
+        metadata: { fields: Object.keys(patch) },
+      },
+    };
   });
   return toPublicUser((await getUser(id))!);
 }
@@ -176,15 +182,15 @@ export async function updateEmployee(
 // Hard delete: the user doc, their email/phone/username, and everything that could still let them in (refresh
 // tokens, setup links, a pending email code) go in one transaction, then their open sockets are dropped.
 // requireAuth re-checks the account, so an access token they still hold stops working immediately. The activity
-// entry keeps a copy of the name.
-// Phase 3: unassign their open tasks in this same transaction.
+// entry keeps a copy of the name. Their open tasks become unassigned, so the owner can hand the work on.
 export async function deleteEmployee(actor: AuthUser, id: string): Promise<void> {
   const ref = users.doc(id);
-  await db.runTransaction(async (tx) => {
+  await mutate(async (tx) => {
     const current = (await getEmployeeDoc(tx, ref)).data()!;
-    const [refresh, setup] = await Promise.all([
+    const [refresh, setup, openTasks] = await Promise.all([
       tx.get(db.collection('refreshTokens').where('userId', '==', id)),
       tx.get(setupTokens.where('userId', '==', id)),
+      readOpenTasks(tx, id),
     ]);
 
     tx.delete(ref);
@@ -193,15 +199,20 @@ export async function deleteEmployee(actor: AuthUser, id: string): Promise<void>
     if (current.username) tx.delete(uniqueRef('username', current.username));
     tx.delete(codeRef('email', current.email));
     for (const doc of [...refresh.docs, ...setup.docs]) tx.delete(doc.ref);
-    recordActivity(tx, {
-      actorId: actor.id,
-      actorName: actor.name,
-      action: 'employee.deleted',
-      targetType: 'user',
-      targetId: id,
-      targetName: current.name,
-      visibility: 'feed',
-    });
+    return {
+      result: undefined,
+      activity: {
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'employee.deleted',
+        targetType: 'user',
+        targetId: id,
+        targetName: current.name,
+        visibility: 'feed',
+        metadata: { unassignedTasks: openTasks.length },
+      },
+      emit: unassignTasks(tx, openTasks),
+    };
   });
   disconnectUser(id);
 }
@@ -209,23 +220,25 @@ export async function deleteEmployee(actor: AuthUser, id: string): Promise<void>
 // Replaces any earlier link, so only the newest email works.
 export async function resendInvite(actor: AuthUser, id: string): Promise<InviteResult> {
   const ref = users.doc(id);
-  const { raw, employee } = await db.runTransaction(async (tx) => {
+  const { raw, employee } = await mutate(async (tx) => {
     const employee = (await getEmployeeDoc(tx, ref)).data()!;
     if (employee.status !== 'invited')
       throw new AppError('CONFLICT', 'Employee has already set up their account', 409);
     const old = await tx.get(setupTokens.where('userId', '==', id));
 
     for (const doc of old.docs) tx.delete(doc.ref);
-    recordActivity(tx, {
-      actorId: actor.id,
-      actorName: actor.name,
-      action: 'employee.invite_resent',
-      targetType: 'user',
-      targetId: id,
-      targetName: employee.name,
-      visibility: 'audit',
-    });
-    return { raw: issueSetupToken(tx, id), employee };
+    return {
+      result: { raw: issueSetupToken(tx, id), employee },
+      activity: {
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'employee.invite_resent',
+        targetType: 'user',
+        targetId: id,
+        targetName: employee.name,
+        visibility: 'audit',
+      },
+    };
   });
   return sendInvite({ id, name: employee.name, email: employee.email }, actor.name, raw);
 }

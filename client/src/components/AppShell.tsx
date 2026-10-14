@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useLogout } from '../features/auth/session';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { socket } from '../lib/socket';
 import type { User } from '../lib/types';
 
@@ -30,8 +31,11 @@ export function AppShell({ user }: { user: User }) {
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
           <span className="font-semibold text-slate-900">Skipli</span>
           <nav className="flex gap-1">
+            <NavLink to="/" end className={navClass}>
+              Tasks
+            </NavLink>
             {user.role === 'owner' && (
-              <NavLink to="/" end className={navClass}>
+              <NavLink to="/employees" className={navClass}>
                 Employees
               </NavLink>
             )}
@@ -49,6 +53,7 @@ export function AppShell({ user }: { user: User }) {
               />
               <span className="hidden sm:inline">{connected ? 'Live' : 'Offline'}</span>
             </span>
+            <NotificationBell />
             <span className="hidden text-sm text-slate-700 sm:inline">{user.name}</span>
             <button
               onClick={() => logout.mutate()}
