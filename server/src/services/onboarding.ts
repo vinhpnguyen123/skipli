@@ -6,8 +6,7 @@ import {
   type Timestamp,
 } from 'firebase-admin/firestore';
 import { AppError } from '../lib/errors.js';
-import { db } from '../lib/firebase.js';
-import { recordActivity } from './activity.js';
+import { mutate } from './mutate.js';
 import { hashSetupToken, setupTokens } from './setup-token.js';
 import { uniqueRef, users } from './users.js';
 
@@ -58,7 +57,7 @@ export async function completeSetup(
   // Hashed before the transaction: bcrypt is slow on purpose, and Firestore may retry the transaction body.
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
 
-  await db.runTransaction(async (tx) => {
+  await mutate(async (tx) => {
     const { ref, user } = await loadSetup(tx, raw);
     if ((await tx.get(uniqueRef('username', username))).exists) {
       throw new AppError('CONFLICT', 'That username is taken', 409, [{ path: 'username' }]);
@@ -75,15 +74,18 @@ export async function completeSetup(
       updatedAt: FieldValue.serverTimestamp(),
     });
     const name = user.data()!.name;
-    recordActivity(tx, {
-      actorId: user.id,
-      actorName: name,
-      action: 'employee.setup_completed',
-      targetType: 'user',
-      targetId: user.id,
-      targetName: name,
-      visibility: 'feed',
-    });
+    return {
+      result: undefined,
+      activity: {
+        actorId: user.id,
+        actorName: name,
+        action: 'employee.setup_completed',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: name,
+        visibility: 'feed',
+      },
+    };
   });
   return { username };
 }

@@ -38,3 +38,9 @@ export function initSocket(httpServer: HttpServer): Server {
 export function disconnectUser(userId: string): void {
   io?.in(`user:${userId}`).disconnectSockets(true);
 }
+
+// Sends one event to every socket in any of these rooms (a socket in several rooms gets it once).
+// No-op in tests that build only the Express app.
+export function emitTo(rooms: string[], event: string, data: unknown): void {
+  if (rooms.length) io?.to(rooms).emit(event, data);
+}
