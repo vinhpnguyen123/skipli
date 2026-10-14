@@ -1,9 +1,6 @@
 import { queryClient } from './query';
 import type { SessionResponse, User } from './types';
 
-// Empty in dev: vite proxies /api to localhost:3000. In production it is the Render URL.
-const BASE = import.meta.env.VITE_API_URL ?? '';
-
 // details: per-field problems from the server, e.g. [{ path: 'email', message: '…' }] (400) or [{ path: 'email' }] (409).
 export type FieldIssue = { path: string; message?: string };
 
@@ -43,7 +40,9 @@ export const setAccessToken = (token: string | null) => {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}/api${path}`, {
+  // Always same-origin: Vite proxies /api to the server in dev, Vercel rewrites it to Render in production.
+  // That keeps the refresh cookie first-party.
+  const res = await fetch(`/api${path}`, {
     ...init,
     credentials: 'include',
     headers: {

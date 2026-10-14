@@ -1,9 +1,11 @@
 import { io } from 'socket.io-client';
 import { getAccessToken, refreshSession } from './api';
 
-// undefined = same origin, which the vite dev proxy forwards to the server.
+// Production connects straight to Render (VITE_SOCKET_URL), not through Vercel's /api rewrite: the socket
+// authenticates with the access token, not the cookie, so it has no reason to share the app's origin.
+// Unset in dev = same origin via the Vite proxy.
 // Connected by the app once signed in. `auth` is a function, so every (re)connect sends the current token.
-export const socket = io(import.meta.env.VITE_API_URL || undefined, {
+export const socket = io(import.meta.env.VITE_SOCKET_URL || undefined, {
   path: '/socket.io',
   transports: ['websocket'],
   withCredentials: true,

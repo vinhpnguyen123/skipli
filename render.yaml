@@ -28,6 +28,9 @@ services:
         sync: false
       - key: OTP_HMAC_SECRET
         sync: false
+      # Same value as ORIGIN_SECRET in Vercel. Set it after the Vercel deploy that sends it is live.
+      - key: ORIGIN_SECRET
+        sync: false
       - key: CRON_SECRET
         sync: false
       - key: TWILIO_ACCOUNT_SID

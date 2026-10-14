@@ -12,12 +12,13 @@ import {
 } from '../services/session.js';
 
 const COOKIE = 'rt';
-// Client and API are cross-site (Vercel / Render), so the cookie must be SameSite=None; Secure.
+// The browser reaches the API on the app's own origin (Vercel rewrites /api to Render; Vite proxies it in dev),
+// so the cookie is first-party and SameSite=Lax: other sites' requests don't carry it.
 // Path-scoped so it's only sent to the refresh/logout endpoints.
 const cookieOptions = {
   httpOnly: true,
   secure: true,
-  sameSite: 'none',
+  sameSite: 'lax',
   path: '/api/auth',
 } as const;
 
@@ -28,8 +29,8 @@ export async function startSession(res: Response, user: PublicUser) {
   return { accessToken: signAccessToken(user), expiresIn: ACCESS_TOKEN_TTL_SEC, user };
 }
 
-// SameSite=None means other sites' forms would carry the cookie too. A custom header forces a CORS
-// preflight, which only APP_URL passes, so a cross-site page can't rotate or revoke someone's session.
+// Defense in depth on top of SameSite=Lax: a custom header forces a CORS preflight, which only APP_URL passes,
+// so even a same-site page we don't control can't rotate or revoke someone's session.
 function requireAppHeader(req: Request) {
   if (req.get('X-Requested-With') !== 'skipli') throw new AppError('FORBIDDEN', 'Not allowed', 403);
 }
