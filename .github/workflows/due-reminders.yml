@@ -1,0 +1,31 @@
+# Hourly due-date reminders: calls the API, which notifies assignees of tasks due within 24 hours or overdue.
+# Goes through the Vercel URL (like the browser), so it passes the origin check; the server then checks
+# CRON_SECRET (repo Settings → Secrets and variables → Actions; same value as on Render).
+# Scheduled workflows run only from the default branch (main). Run it by hand from the Actions tab too.
+name: Due-date reminders
+
+on:
+  schedule:
+    - cron: '7 * * * *' # hourly, a few minutes past the hour (GitHub is busiest on the hour); times are UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: due-reminders
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the reminder endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        # Render's free plan sleeps when idle and takes up to a minute to wake, so retry with pauses.
+        # Each run only sends reminders not sent yet, so a retry never duplicates one.
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "::error::CRON_SECRET secret is not set"; exit 1; fi
+          curl --fail-with-body --silent --show-error \
+            --max-time 90 --retry 4 --retry-delay 20 --retry-all-errors \
+            -X POST -H "Authorization: Bearer $CRON_SECRET" \
+            https://skipli.vercel.app/api/cron/due-reminders

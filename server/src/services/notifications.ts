@@ -97,6 +97,9 @@ export async function markRead(user: AuthUser, ids: string[] | 'all'): Promise<{
 // Never throws, sync or async: callers fire and forget, the change is already saved, and an escaping error
 // would either fail a request that succeeded or become an unhandled rejection. The message is built inside
 // the try for the same reason.
+// ponytail: best effort, at most once. A failed send (Resend down) or a crash right after the commit loses the
+// email; it is not retried, but the in-app notification it copies is already saved. For guaranteed delivery,
+// write an email "outbox" doc in the same transaction and have a job send and mark those, with retries.
 export async function emailIfOffline(
   userId: string,
   subject: string,

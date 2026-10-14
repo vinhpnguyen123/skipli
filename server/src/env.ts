@@ -19,6 +19,8 @@ export const env = {
   TRUST_PROXY: trustProxy(process.env.TRUST_PROXY ?? '1'),
   // Shared with Vercel, which sends it on the /api rewrite. When set, /api only accepts requests carrying it.
   ORIGIN_SECRET: process.env.ORIGIN_SECRET,
+  // The scheduler (GitHub Actions) sends it to /api/cron/*. Unset = cron endpoints refuse every call.
+  CRON_SECRET: process.env.CRON_SECRET,
   // Optional: without them SMS sends fail (logged), and only demo accounts can sign in.
   TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
