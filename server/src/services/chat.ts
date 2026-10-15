@@ -21,7 +21,7 @@ const notFound = () => new AppError('NOT_FOUND', 'Conversation not found', 404);
 
 // The two participants, if `id` is the canonical (sorted) id of a pair that includes the caller. Anything
 // else looks like it doesn't exist, so ids of other people's conversations can't be probed.
-function participantsOf(user: AuthUser, id: string): { me: string; other: string } {
+export function participantsOf(user: AuthUser, id: string): { me: string; other: string } {
   const [a, b] = id.split('_');
   if (!a || !b || a === b || id !== conversationIdFor(a, b)) throw notFound();
   if (user.id !== a && user.id !== b) throw notFound();

@@ -16,7 +16,8 @@ jest.unstable_mockModule('../lib/email.js', () => ({
 }));
 const { db } = await import('../lib/firebase.js');
 const { createApp } = await import('../app.js');
-const { initSocket } = await import('../socket/index.js');
+const { initSocket, isOnline } = await import('../socket/index.js');
+const { presenceTick, TTL_MS } = await import('../socket/presence.js');
 const { signAccessToken } = await import('../services/session.js');
 
 const app = createApp();
@@ -49,6 +50,7 @@ const get = (x: Person, path: string) => request(app).get(`/api${path}`).set(aut
 const settle = () => new Promise((r) => setTimeout(r, 400));
 
 let server: Server;
+let io: ReturnType<typeof initSocket>;
 const sockets: Socket[] = [];
 
 // A connected client for `x`, recording every event it receives.
@@ -85,7 +87,7 @@ beforeAll(async () => {
     });
   }
   server = createServer(app);
-  initSocket(server);
+  io = initSocket(server);
   await new Promise<void>((r) => server.listen(0, r));
 });
 
@@ -188,14 +190,12 @@ describe('sending', () => {
         error: { code: 'VALIDATION_ERROR', message: expected },
       });
     }
-    const extra = await a.s
-      .timeout(5000)
-      .emitWithAck('message:send', {
-        conversationId: id,
-        clientMessageId: randomUUID(),
-        text: 'x',
-        admin: true,
-      });
+    const extra = await a.s.timeout(5000).emitWithAck('message:send', {
+      conversationId: id,
+      clientMessageId: randomUUID(),
+      text: 'x',
+      admin: true,
+    });
     expect(extra).toMatchObject({ ok: false, error: { code: 'VALIDATION_ERROR' } });
   });
 
@@ -333,5 +333,104 @@ describe('after a participant is deleted', () => {
       ok: false,
       error: { code: 'CONVERSATION_CLOSED' },
     });
+  });
+});
+
+describe('presence', () => {
+  // Sockets left open by earlier tests would keep their users online.
+  beforeEach(async () => {
+    for (const s of sockets) s.close();
+    await settle();
+    await redis.flushall();
+  });
+
+  const updatesFor = (events: [string, Record<string, unknown>][], x: Person) =>
+    events.filter(([e, d]) => e === 'presence:update' && d.userId === x.id).map(([, d]) => d);
+
+  it('announces online on the first tab, offline (with last seen) when the last tab closes', async () => {
+    const b = await client(bob);
+    const a1 = await client(ann);
+    const a2 = await client(ann);
+    await settle();
+    expect(updatesFor(b.events, ann)).toEqual([{ userId: ann.id, online: true, lastSeen: null }]);
+    expect((await get(bob, '/presence')).body.online).toContain(ann.id);
+
+    a1.s.close();
+    await settle();
+    expect(updatesFor(b.events, ann)).toHaveLength(1); // second tab still open
+
+    a2.s.close();
+    await settle();
+    const [, offline] = updatesFor(b.events, ann);
+    expect(offline).toMatchObject({ userId: ann.id, online: false, lastSeen: expect.any(String) });
+    const snapshot = (await get(bob, '/presence')).body;
+    expect(snapshot.online).not.toContain(ann.id);
+    expect(snapshot.lastSeen[ann.id]).toBe(offline.lastSeen);
+  });
+
+  it('drops users whose heartbeat stopped (crashed instance) and keeps connected ones', async () => {
+    const b = await client(bob);
+    const stoppedAt = Date.now() - TTL_MS - 5_000;
+    await redis.zadd('presence', stoppedAt, cat.id); // Cat was on an instance that died
+    await presenceTick(io);
+    await settle();
+
+    expect(updatesFor(b.events, cat)).toEqual([
+      { userId: cat.id, online: false, lastSeen: new Date(stoppedAt).toISOString() },
+    ]);
+    const { online } = (await get(bob, '/presence')).body;
+    expect(online).toContain(bob.id);
+    expect(online).not.toContain(cat.id);
+  });
+});
+
+describe('presence races and failures', () => {
+  it("doesn't mark someone offline when a heartbeat lands between the sweep's read and its removal", async () => {
+    const b = await client(bob);
+    await redis.zadd('presence', Date.now() - TTL_MS - 5_000, cat.id);
+    // Another instance re-stamps Cat right after this sweep picked her as stale.
+    const read = redis.zrangebyscore.bind(redis);
+    const spy = jest
+      .spyOn(redis, 'zrangebyscore')
+      .mockImplementationOnce(async (...args: unknown[]) => {
+        const stale = await (read as (...a: unknown[]) => Promise<string[]>)(...args);
+        await redis.zadd('presence', Date.now(), cat.id);
+        return stale;
+      });
+    await presenceTick(io);
+    spy.mockRestore();
+    await settle();
+
+    expect(b.events.filter(([e, d]) => e === 'presence:update' && d.userId === cat.id)).toEqual([]);
+    expect((await get(bob, '/presence')).body.online).toContain(cat.id);
+  });
+
+  it('treats a failed cross-instance online check as offline, so notification emails still go out', async () => {
+    const spy = jest.spyOn(io, 'in').mockReturnValueOnce({
+      fetchSockets: () =>
+        Promise.reject(new Error('timeout reached while waiting for fetchSockets response')),
+    } as unknown as ReturnType<typeof io.in>);
+    expect(await isOnline(ann.id)).toBe(false);
+    spy.mockRestore();
+  });
+});
+
+describe('typing', () => {
+  it('relays start and stop to the other participant only, and drops conversations you are not in', async () => {
+    const [a, b, c] = [await client(ann), await client(bob), await client(cat)];
+    const typing = (events: typeof a.events) =>
+      events.filter(([e]) => e.startsWith('typing:')).map(([e, d]) => [e, d]);
+    a.s.emit('typing:start', { conversationId: idFor(ann, bob) });
+    a.s.emit('typing:stop', { conversationId: idFor(ann, bob) });
+    a.s.emit('typing:start', { conversationId: idFor(bob, cat) }); // not Ann's
+    a.s.emit('typing:start', 'junk');
+    await settle();
+
+    expect(typing(b.events)).toEqual([
+      ['typing:start', { conversationId: idFor(ann, bob), userId: ann.id }],
+      ['typing:stop', { conversationId: idFor(ann, bob), userId: ann.id }],
+    ]);
+    expect(typing(a.events)).toEqual([]);
+    expect(typing(c.events)).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { button } from '../../components/ui';
+import { ago } from '../../lib/time';
 import type { AppNotification } from '../../lib/types';
 import { useMarkRead, useNotificationEvents, useNotifications } from './hooks';
 
@@ -8,14 +9,6 @@ const TEXT: Record<AppNotification['type'], (n: AppNotification) => string> = {
   'task.assigned': (n) => `${n.payload.by ?? 'Your manager'} assigned you “${n.payload.title}”`,
   'task.due_soon': (n) => `“${n.payload.title}” is due soon`,
   'task.overdue': (n) => `“${n.payload.title}” is overdue`,
-};
-
-const ago = (iso: string) => {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
-  if (mins < 60) return rtf.format(-mins, 'minute');
-  if (mins < 60 * 24) return rtf.format(-Math.round(mins / 60), 'hour');
-  return rtf.format(-Math.round(mins / (60 * 24)), 'day');
 };
 
 // Native popover: outside clicks and Escape close it, and it renders above everything without a portal.

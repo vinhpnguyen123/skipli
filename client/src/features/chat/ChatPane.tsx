@@ -10,9 +10,13 @@ import {
   useDirectory,
   useMarkRead,
   useMessages,
+  useOtherTyping,
   useOutbox,
+  useTypingSignal,
   useWindowFocused,
 } from './hooks';
+import { PresenceDot } from './PresenceDot';
+import { useStatusOf } from './presence';
 
 const time = (iso: string) =>
   new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -34,6 +38,9 @@ export function ChatPane({ me, id }: { me: User; id: string }) {
   const [text, setText] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
   const top = useRef<HTMLDivElement>(null);
+  const status = useStatusOf(otherId);
+  const otherTyping = useOtherTyping(id);
+  const signalTyping = useTypingSignal(id);
 
   const unread = conv?.unread ?? 0;
   useEffect(() => {
@@ -62,6 +69,7 @@ export function ChatPane({ me, id }: { me: User; id: string }) {
     const body = text.trim();
     if (!body) return;
     setText('');
+    signalTyping(false);
     void sendMessage(me.id, id, crypto.randomUUID(), body);
     scroller.current?.scrollTo({ top: 0 }); // column-reverse: 0 is the bottom
   };
@@ -85,9 +93,18 @@ export function ChatPane({ me, id }: { me: User; id: string }) {
           ←
         </Link>
         <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold text-slate-900">{other.name}</h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <span className="truncate">{other.name}</span>
+            {other.active && <PresenceDot userId={other.id} />}
+          </h2>
           <p className="truncate text-xs text-slate-500">
             {other.role === 'owner' ? 'Manager' : other.title || 'Employee'}
+            {other.active && (
+              <span className={otherTyping ? 'text-blue-600' : ''} aria-live="polite">
+                {' · '}
+                {otherTyping ? 'typing…' : status.label}
+              </span>
+            )}
           </p>
         </div>
       </header>
@@ -160,7 +177,11 @@ export function ChatPane({ me, id }: { me: User; id: string }) {
             rows={1}
             value={text}
             maxLength={MAX}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              signalTyping(!!e.target.value.trim());
+            }}
+            onBlur={() => signalTyping(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();

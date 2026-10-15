@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useLogout } from '../features/auth/session';
 import { useChatEvents, useConversations } from '../features/chat/hooks';
+import { usePresenceEvents } from '../features/chat/presence';
 import { NotificationBell } from '../features/notifications/NotificationBell';
 import { socket } from '../lib/socket';
 import type { User } from '../lib/types';
@@ -28,6 +29,7 @@ export function AppShell({ user }: { user: User }) {
   const conversations = useConversations();
   const unreadChats = conversations.data?.reduce((n, c) => n + c.unread, 0) ?? 0;
   useChatEvents(user.id);
+  usePresenceEvents();
 
   return (
     <div className="min-h-screen bg-slate-50">

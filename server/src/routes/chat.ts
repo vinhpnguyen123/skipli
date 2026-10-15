@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { conversationParams, messagesQuery } from '../schemas/chat.js';
 import { listConversations, listDirectory, listMessages, markRead } from '../services/chat.js';
+import { getPresence } from '../socket/presence.js';
 
 // Mounted at /api. Any signed-in user; conversation access is checked in the service (participants only).
 // Sending a message is a socket event (`message:send`, see socket/chat.ts), not a route.
@@ -10,6 +11,11 @@ export const chatRouter = Router();
 
 chatRouter.get('/directory', requireAuth, async (req, res) => {
   res.json({ people: await listDirectory(req.user!) });
+});
+
+// Who's online and everyone's last seen; `presence:update` keeps it current after this.
+chatRouter.get('/presence', requireAuth, async (_req, res) => {
+  res.json(await getPresence());
 });
 
 chatRouter.get('/conversations', requireAuth, async (req, res) => {

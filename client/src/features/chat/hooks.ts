@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, type InfiniteData } from '@tanstack/react-query';
-import { useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { api, post } from '../../lib/api';
 import { queryClient } from '../../lib/query';
 import { socket } from '../../lib/socket';
@@ -174,4 +174,55 @@ export function useWindowFocused() {
     },
     () => document.hasFocus() && document.visibilityState === 'visible',
   );
+}
+
+type TypingEvent = { conversationId: string };
+
+// Whether the other person is typing here. Hidden 3s after their last start, so a lost stop can't leave it
+// stuck, and as soon as a message arrives.
+export function useOtherTyping(conversationId: string) {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      clearTimeout(timer);
+      setTyping(false);
+    };
+    const start = (e: TypingEvent) => {
+      if (e.conversationId !== conversationId) return;
+      setTyping(true);
+      clearTimeout(timer);
+      timer = setTimeout(stop, 3000);
+    };
+    const end = (e: TypingEvent) => e.conversationId === conversationId && stop();
+    socket.on('typing:start', start).on('typing:stop', end).on('message:new', end);
+    socket.on('disconnect', stop);
+    return () => {
+      clearTimeout(timer);
+      socket.off('typing:start', start).off('typing:stop', end).off('message:new', end);
+      socket.off('disconnect', stop);
+    };
+  }, [conversationId]);
+  return typing;
+}
+
+// Tells the other side you're typing: start at most every 2s while you type, stop once when you send,
+// clear the box, leave it, or close the chat.
+export function useTypingSignal(conversationId: string) {
+  const lastStart = useRef(0);
+  useEffect(
+    () => () => {
+      if (lastStart.current) socket.emit('typing:stop', { conversationId });
+    },
+    [conversationId],
+  );
+  return (typing: boolean) => {
+    if (typing && Date.now() - lastStart.current > 2000) {
+      lastStart.current = Date.now();
+      socket.emit('typing:start', { conversationId });
+    } else if (!typing && lastStart.current) {
+      lastStart.current = 0;
+      socket.emit('typing:stop', { conversationId });
+    }
+  };
 }

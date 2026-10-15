@@ -3,7 +3,7 @@ import { AppError } from '../lib/errors.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { consume } from '../middleware/rate-limit.js';
 import { sendMessageSchema } from '../schemas/chat.js';
-import { sendMessage, type Message } from '../services/chat.js';
+import { participantsOf, sendMessage, type Message } from '../services/chat.js';
 
 export type SendAck =
   | { ok: true; message: Message }
@@ -43,4 +43,25 @@ export function registerChatHandlers(socket: Socket, user: AuthUser) {
       reply(toAckError(err));
     }
   });
+
+  // Typing: relayed to the other participant's tabs, never stored. The client sends start at most every
+  // couple of seconds while typing and the receiver hides the indicator 3s after the last one, so a lost
+  // stop can't leave it stuck. Not someone's conversation = silently dropped.
+  let lastStart = 0;
+  const relay = (event: 'typing:start' | 'typing:stop') => (payload: unknown) => {
+    const conversationId = (payload as { conversationId?: unknown } | null)?.conversationId;
+    if (typeof conversationId !== 'string' || conversationId.length > 300) return;
+    if (event === 'typing:start') {
+      if (Date.now() - lastStart < 1000) return; // ponytail: per-socket throttle, no Redis hit per keystroke
+      lastStart = Date.now();
+    }
+    try {
+      const { other } = participantsOf(user, conversationId);
+      socket.to(`user:${other}`).emit(event, { conversationId, userId: user.id });
+    } catch {
+      // not a participant
+    }
+  };
+  socket.on('typing:start', relay('typing:start'));
+  socket.on('typing:stop', relay('typing:stop'));
 }

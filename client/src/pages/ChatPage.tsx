@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useParams } from 'react-router-dom';
 import { button, input } from '../components/ui';
 import { ChatPane } from '../features/chat/ChatPane';
 import { conversationIdFor, useConversations, useDirectory } from '../features/chat/hooks';
+import { PresenceDot } from '../features/chat/PresenceDot';
 import type { User } from '../lib/types';
 
 const when = (iso: string) => {
@@ -81,10 +82,13 @@ function ConversationList({ me, onNew }: { me: string; onNew: () => void }) {
           >
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span
-                  className={`truncate text-sm ${c.unread ? 'font-semibold text-slate-900' : 'text-slate-800'} ${c.other.active ? '' : 'italic'}`}
-                >
-                  {c.other.name}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span
+                    className={`truncate text-sm ${c.unread ? 'font-semibold text-slate-900' : 'text-slate-800'} ${c.other.active ? '' : 'italic'}`}
+                  >
+                    {c.other.name}
+                  </span>
+                  {c.other.active && <PresenceDot userId={c.other.id} />}
                 </span>
                 {c.lastMessageAt && (
                   <span className="shrink-0 text-xs text-slate-400">{when(c.lastMessageAt)}</span>
@@ -153,7 +157,10 @@ function Picker({ me, onPick }: { me: string; onPick: () => void }) {
                 }}
                 className="block w-full px-4 py-2.5 text-left hover:bg-slate-50"
               >
-                <span className="block text-sm text-slate-900">{p.name}</span>
+                <span className="flex items-center gap-2 text-sm text-slate-900">
+                  {p.name}
+                  <PresenceDot userId={p.id} />
+                </span>
                 <span className="block text-xs text-slate-500">
                   {p.role === 'owner'
                     ? 'Manager'
