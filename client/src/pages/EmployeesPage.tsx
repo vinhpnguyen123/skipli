@@ -1,3 +1,4 @@
+import { PresenceDot } from '../features/chat/PresenceDot';
 import { useMemo, useState } from 'react';
 import { Dialog } from '../components/Dialog';
 import { NoticeBanner } from '../components/Notice';
@@ -139,7 +140,10 @@ export default function EmployeesPage() {
               {shown.map((e) => (
                 <tr key={e.id} className="hover:bg-slate-50/60">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{e.name}</div>
+                    <div className="flex items-center gap-2 font-medium text-slate-900">
+                      {e.name}
+                      {e.status === 'active' && <PresenceDot userId={e.id} />}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {e.title}
                       {/* Email moves under the name on small screens. */}

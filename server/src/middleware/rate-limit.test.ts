@@ -17,10 +17,21 @@ const byPhone = (req: express.Request) => req.body.phone;
 const app = express();
 app.use(express.json());
 app.post('/ip', rateLimit({ name: 'ip', limit: 2, windowSec: 60, by: 'ip' }), ok);
-app.post('/target', rateLimit({ name: 'target', limit: 1, windowSec: 60, by: 'target', target: byPhone }), ok);
+app.post(
+  '/target',
+  rateLimit({ name: 'target', limit: 1, windowSec: 60, by: 'target', target: byPhone }),
+  ok,
+);
 app.post(
   '/otp',
-  rateLimit({ name: 'otp', limit: 1, windowSec: 60, by: 'target', target: byPhone, onRedisDown: 'memory' }),
+  rateLimit({
+    name: 'otp',
+    limit: 1,
+    windowSec: 60,
+    by: 'target',
+    target: byPhone,
+    onRedisDown: 'memory',
+  }),
   ok,
 );
 app.use(errorHandler);

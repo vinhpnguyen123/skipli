@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { post, refreshSession, setAccessToken } from '../../lib/api';
 import { queryClient } from '../../lib/query';
 import { socket } from '../../lib/socket';
+import { clearOutbox } from '../chat/hooks';
 import type { SessionResponse, User } from '../../lib/types';
 
 // The signed-in user, or null. On first load it tries the refresh cookie, so a reload keeps you signed in.
@@ -25,6 +26,7 @@ export function useLogout() {
     onSettled: () => {
       setAccessToken(null);
       socket.disconnect();
+      clearOutbox();
       // Update the session query in place: removing it would detach App's useSession observer,
       // and the UI wouldn't see the sign-out until a reload.
       queryClient.setQueryData(['session'], null);
