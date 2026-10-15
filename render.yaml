@@ -11,13 +11,13 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: APP_URL
         sync: false
       - key: BUSINESS_TZ
         value: America/New_York
       - key: DEMO_MODE
-        value: "true"
+        value: 'true'
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_CLIENT_EMAIL

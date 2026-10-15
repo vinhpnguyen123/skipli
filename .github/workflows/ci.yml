@@ -1,0 +1,45 @@
+# Runs on every PR and every push to main. Branch protection requires it before merging, and Render deploys
+# main only after it passes ("Auto-Deploy: After CI Checks Pass").
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # same as Render
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Build
+        run: npm run build
+      # Server tests run against the skipli-dev Firestore (never prod: the project id is pinned here).
+      # Redis, SMS and email are mocked. Secrets: repo Settings → Secrets and variables → Actions.
+      - name: Test
+        env:
+          FIREBASE_PROJECT_ID: skipli-dev
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.DEV_FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.DEV_FIREBASE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$FIREBASE_CLIENT_EMAIL" ] || [ -z "$FIREBASE_PRIVATE_KEY" ]; then
+            echo "::error::DEV_FIREBASE_CLIENT_EMAIL / DEV_FIREBASE_PRIVATE_KEY secrets are not set"; exit 1
+          fi
+          npm test

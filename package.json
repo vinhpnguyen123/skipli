@@ -11,6 +11,7 @@
     "seed": "npm -w server run seed",
     "lint": "oxlint client/src server/src",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "npm -w client exec -- tsc -b && npm -w server exec -- tsc --noEmit",
     "test": "npm -w server test"
   },

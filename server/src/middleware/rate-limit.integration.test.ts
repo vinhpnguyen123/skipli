@@ -7,7 +7,8 @@ const enabled = process.env.RUN_REDIS_INTEGRATION === '1';
 if (enabled) {
   const testUrl = process.env.TEST_REDIS_URL;
   if (!testUrl) throw new Error('RUN_REDIS_INTEGRATION=1 needs TEST_REDIS_URL');
-  if (testUrl === process.env.REDIS_URL) throw new Error('TEST_REDIS_URL must not be the app REDIS_URL');
+  if (testUrl === process.env.REDIS_URL)
+    throw new Error('TEST_REDIS_URL must not be the app REDIS_URL');
   // lib/redis connects to REDIS_URL on import, so point it at the test instance first.
   process.env.REDIS_URL = testUrl;
 }
@@ -22,9 +23,13 @@ if (enabled) {
     const { rateLimit } = await import('./rate-limit.js');
     const { errorHandler } = await import('../lib/errors.js');
     app = express();
-    app.post('/ip', rateLimit({ name: `it-${run}`, limit: 1, windowSec: 60, by: 'ip' }), (_req, res) => {
-      res.json({ ok: true });
-    });
+    app.post(
+      '/ip',
+      rateLimit({ name: `it-${run}`, limit: 1, windowSec: 60, by: 'ip' }),
+      (_req, res) => {
+        res.json({ ok: true });
+      },
+    );
     app.use(errorHandler);
   });
 
