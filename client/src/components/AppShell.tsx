@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useLogout } from '../features/auth/session';
+import { useChatEvents, useConversations } from '../features/chat/hooks';
 import { NotificationBell } from '../features/notifications/NotificationBell';
 import { socket } from '../lib/socket';
 import type { User } from '../lib/types';
@@ -24,6 +25,9 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export function AppShell({ user }: { user: User }) {
   const logout = useLogout();
   const connected = useSocketConnected();
+  const conversations = useConversations();
+  const unreadChats = conversations.data?.reduce((n, c) => n + c.unread, 0) ?? 0;
+  useChatEvents(user.id);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -39,6 +43,15 @@ export function AppShell({ user }: { user: User }) {
                 Employees
               </NavLink>
             )}
+            <NavLink to="/chat" className={navClass}>
+              Chat
+              {unreadChats > 0 && (
+                <span className="ml-1.5 rounded-full bg-blue-600 px-1.5 text-[10px] font-semibold leading-4 text-white">
+                  {unreadChats > 99 ? '99+' : unreadChats}
+                  <span className="sr-only"> unread</span>
+                </span>
+              )}
+            </NavLink>
             <NavLink to="/profile" className={navClass}>
               Profile
             </NavLink>

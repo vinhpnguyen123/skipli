@@ -37,3 +37,34 @@ export type AppNotification = {
   read: boolean;
   createdAt: string;
 };
+
+// Mirrors server/src/services/chat.ts.
+export type Message = { id: string; senderId: string; text: string; createdAt: string };
+
+// `active: false` = deleted or no longer active: the chat stays readable but you can't reply.
+export type Participant = {
+  id: string;
+  name: string;
+  title: string;
+  role: 'owner' | 'employee';
+  active: boolean;
+};
+
+export type Conversation = {
+  id: string;
+  other: Participant;
+  lastMessage: string;
+  lastMessageAt: string | null;
+  lastSenderId: string | null;
+  unread: number;
+  otherLastReadAt: string | null;
+};
+
+// GET /directory: coworkers you can start a chat with.
+export type Person = {
+  id: string;
+  name: string;
+  title: string;
+  department: string;
+  role: 'owner' | 'employee';
+};
