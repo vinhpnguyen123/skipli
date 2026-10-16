@@ -36,8 +36,18 @@ const markRead = (p: Person, body: object) =>
   request(app).patch('/api/notifications/read').set(auth(p)).send(body);
 const notificationsAbout = async (taskId: string) =>
   (await notifications.where('payload.taskId', '==', taskId).get()).docs.map((d) => d.data());
-// Emails go out after the response; give them a moment.
-const settle = () => new Promise((r) => setTimeout(r, 400));
+// Emails go out after the response.
+// For things that must happen in the background: retries the assertion until it passes (or 5 s go by),
+// so a slow Firestore read under parallel test load doesn't fail a fixed sleep.
+async function eventually(assertion: () => void, ms = 5000) {
+  for (const start = Date.now(); ; await new Promise((r) => setTimeout(r, 50))) {
+    try {
+      return assertion();
+    } catch (err) {
+      if (Date.now() - start > ms) throw err;
+    }
+  }
+}
 
 beforeAll(async () => {
   for (const p of people) {
@@ -109,13 +119,14 @@ describe('email when offline', () => {
       assigneeId: ann.id,
       dueDate: '2030-01-02T17:00:00Z',
     }).expect(201);
-    await settle();
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: `${ann.id}@example.com`,
-        subject: 'New task: Email me',
-        text: expect.stringContaining('Due Jan 2, 2030, 12:00 PM EST'),
-      }),
+    await eventually(() =>
+      expect(sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          to: `${ann.id}@example.com`,
+          subject: 'New task: Email me',
+          text: expect.stringContaining('Due Jan 2, 2030, 12:00 PM EST'),
+        }),
+      ),
     );
   });
 
@@ -128,8 +139,7 @@ describe('email when offline', () => {
       dueDate: '2030-01-02T17:00:00Z',
     });
     expect(res.status).toBe(201);
-    await settle();
-    expect(err).toHaveBeenCalled();
+    await eventually(() => expect(err).toHaveBeenCalled());
     err.mockRestore();
   });
 });
@@ -217,7 +227,7 @@ describe('realtime', () => {
   it('pushes the notification to an online assignee instead of emailing, and syncs reads across tabs', async () => {
     const [tab1, tab2] = [await tab(ann), await tab(ann)];
     const task = (await createTask({ title: 'Live one', assigneeId: ann.id })).body;
-    await settle();
+    await eventually(() => expect(tab1.map(([e]) => e)).toContain('notification:new'));
     const pushed = tab1.find(([e]) => e === 'notification:new')?.[1] as {
       id: string;
       payload: { taskId: string };
@@ -226,7 +236,8 @@ describe('realtime', () => {
     expect(sendEmail).not.toHaveBeenCalled();
 
     await markRead(ann, { ids: [pushed.id] }).expect(200);
-    await settle();
-    expect(tab2).toContainEqual(['notification:read', { ids: [pushed.id] }]);
+    await eventually(() =>
+      expect(tab2).toContainEqual(['notification:read', { ids: [pushed.id] }]),
+    );
   });
 });
