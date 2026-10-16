@@ -36,10 +36,10 @@ jobs:
       - name: Test
         env:
           FIREBASE_PROJECT_ID: skipli-dev
-          FIREBASE_CLIENT_EMAIL: ${{ secrets.DEV_FIREBASE_CLIENT_EMAIL }}
-          FIREBASE_PRIVATE_KEY: ${{ secrets.DEV_FIREBASE_PRIVATE_KEY }}
+          FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+          FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
         run: |
           if [ -z "$FIREBASE_CLIENT_EMAIL" ] || [ -z "$FIREBASE_PRIVATE_KEY" ]; then
-            echo "::error::DEV_FIREBASE_CLIENT_EMAIL / DEV_FIREBASE_PRIVATE_KEY secrets are not set"; exit 1
+            echo "::error::FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY secrets are not set"; exit 1
           fi
           npm test
