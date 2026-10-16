@@ -68,3 +68,27 @@ export type Person = {
   department: string;
   role: 'owner' | 'employee';
 };
+
+// Mirrors server/src/services/schedules.ts. Times are 'HH:mm' wall-clock in timeZone (the business's);
+// overnight shifts arrive split at midnight, so `end` can be '24:00'.
+export type Shift = { dayOfWeek: number; start: string; end: string };
+export type Schedule = {
+  employeeId: string;
+  shifts: Shift[];
+  timeZone: string;
+  updatedAt: string | null;
+};
+
+// Mirrors Activity in server/src/services/activity.ts. Names are snapshots from when it happened.
+export type Activity = {
+  id: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  targetName: string;
+  visibility: 'feed' | 'audit';
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};

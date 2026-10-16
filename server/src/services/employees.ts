@@ -41,7 +41,7 @@ async function assertAvailable(tx: Transaction, claims: [UniqueField, string][])
 
 const notFound = () => new AppError('NOT_FOUND', 'Employee not found', 404);
 
-async function getEmployeeDoc(tx: Transaction, ref: DocumentReference) {
+export async function getEmployeeDoc(tx: Transaction, ref: DocumentReference) {
   const snap = await tx.get(ref);
   if (!snap.exists || snap.data()!.role !== 'employee') throw notFound();
   return snap;
@@ -179,7 +179,7 @@ export async function updateEmployee(
   return toPublicUser((await getUser(id))!);
 }
 
-// Hard delete: the user doc, their email/phone/username, and everything that could still let them in (refresh
+// Hard delete: the user doc, their email/phone/username, their schedule, and everything that could still let them in (refresh
 // tokens, setup links, a pending email code) go in one transaction, then their open sockets are dropped.
 // requireAuth re-checks the account, so an access token they still hold stops working immediately. The activity
 // entry keeps a copy of the name. Their open tasks become unassigned, so the owner can hand the work on.
@@ -198,6 +198,7 @@ export async function deleteEmployee(actor: AuthUser, id: string): Promise<void>
     if (current.phone) tx.delete(uniqueRef('phone', current.phone));
     if (current.username) tx.delete(uniqueRef('username', current.username));
     tx.delete(codeRef('email', current.email));
+    tx.delete(db.collection('schedules').doc(id));
     for (const doc of [...refresh.docs, ...setup.docs]) tx.delete(doc.ref);
     return {
       result: undefined,

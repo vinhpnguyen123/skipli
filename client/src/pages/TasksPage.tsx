@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Dialog } from '../components/Dialog';
 import { NoticeBanner } from '../components/Notice';
 import { useNotice } from '../components/useNotice';
 import { button, toolbarSelect } from '../components/ui';
+import { ActivityList } from '../features/activity/ActivityList';
 import { useEmployees } from '../features/employees/hooks';
 import { Board, type SortBy } from '../features/tasks/Board';
 import { COLUMNS } from '../features/tasks/columns';
@@ -180,6 +181,18 @@ export default function TasksPage({ user }: { user: User }) {
           />
         )}
       </div>
+
+      {isOwner && (
+        <section className="mt-8 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-900">Recent activity</h2>
+            <Link to="/activity" className={button.link}>
+              Full log
+            </Link>
+          </div>
+          <ActivityList visibility="feed" limit={8} />
+        </section>
+      )}
 
       <Dialog open={modal?.kind === 'new'} onClose={close} title="New task">
         <TaskForm

@@ -15,7 +15,9 @@ export type EmployeeInput = {
 export type InviteResult = { inviteSent: boolean; setupUrl?: string };
 
 const KEY = ['employees'];
-const refresh = () => queryClient.invalidateQueries({ queryKey: KEY });
+// Schedules list one entry per employee, so they follow the employee list.
+const refresh = () =>
+  Promise.all([KEY, ['schedules']].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 
 // Owner only; pass enabled=false for employees, who may not list staff.
 export function useEmployees(enabled = true) {

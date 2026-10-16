@@ -56,13 +56,16 @@ const roomsFor = (...assignees: (string | null | undefined)[]) => [
 // Employees only ever see their own tasks; anything else looks like it doesn't exist (no id probing).
 const notFound = () => new AppError('NOT_FOUND', 'Task not found', 404);
 
+// Returns the assignee's name, snapshotted into the activity entry.
 async function assertAssignable(tx: Transaction, assigneeId: string | null) {
-  if (!assigneeId) return;
-  if ((await tx.get(users.doc(assigneeId))).data()?.role !== 'employee') {
+  if (!assigneeId) return null;
+  const assignee = (await tx.get(users.doc(assigneeId))).data();
+  if (assignee?.role !== 'employee') {
     throw new AppError('VALIDATION_ERROR', 'Unknown employee', 400, [
       { in: 'body', path: 'assigneeId', message: 'No such employee' },
     ]);
   }
+  return assignee.name as string;
 }
 
 const taskActivity = (actor: AuthUser, id: string, title: string, action: string, metadata = {}) =>
@@ -91,7 +94,7 @@ export async function listTasks(viewer: AuthUser, assigneeId?: string): Promise<
 export async function createTask(actor: AuthUser, input: CreateTaskInput): Promise<Task> {
   const ref = tasks.doc();
   const task = await mutate(async (tx) => {
-    await assertAssignable(tx, input.assigneeId);
+    const assigneeName = await assertAssignable(tx, input.assigneeId);
     const now = Timestamp.now();
     const data = {
       title: input.title,
@@ -114,6 +117,7 @@ export async function createTask(actor: AuthUser, input: CreateTaskInput): Promi
       result: task,
       activity: taskActivity(actor, ref.id, task.title, 'task.created', {
         assigneeId: task.assigneeId,
+        assigneeName,
       }),
       emit: [
         { to: roomsFor(task.assigneeId), event: 'task:created', data: task },
@@ -179,9 +183,8 @@ export async function updateTask(
         task: toTask(id, before),
       });
     }
-    if (patch.assigneeId !== undefined && patch.assigneeId !== before.assigneeId) {
-      await assertAssignable(tx, patch.assigneeId);
-    }
+    const reassigned = patch.assigneeId !== undefined && patch.assigneeId !== before.assigneeId;
+    const assigneeName = reassigned ? await assertAssignable(tx, patch.assigneeId!) : undefined;
 
     const { version, dueDate, ...rest } = patch;
     const changes = {
@@ -199,7 +202,10 @@ export async function updateTask(
     return {
       result: { task, newlyAssigned },
       activity: action
-        ? taskActivity(actor, id, task.title, action, { status: task.status })
+        ? taskActivity(actor, id, task.title, action, {
+            status: task.status,
+            ...(reassigned && { assigneeId: task.assigneeId, assigneeName }),
+          })
         : undefined,
       emit: [
         // The previous assignee hears about it too, so the task leaves their board.

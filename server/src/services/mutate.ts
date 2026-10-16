@@ -19,8 +19,14 @@ type Outcome<T> = {
 export async function mutate<T>(work: (tx: Transaction) => Promise<Outcome<T>>): Promise<T> {
   const { result, emit = [] } = await db.runTransaction(async (tx) => {
     const outcome = await work(tx);
-    if (outcome.activity) recordActivity(tx, outcome.activity);
-    return outcome;
+    if (!outcome.activity) return outcome;
+    // A retried transaction runs work again, so the emit list is rebuilt from this attempt only.
+    const activity = recordActivity(tx, outcome.activity);
+    const live: Emit[] =
+      activity.visibility === 'feed'
+        ? [{ to: ['owner'], event: 'activity:new', data: activity }]
+        : [];
+    return { ...outcome, emit: [...(outcome.emit ?? []), ...live] };
   });
   for (const e of emit) emitTo(e.to, e.event, e.data);
   return result;
