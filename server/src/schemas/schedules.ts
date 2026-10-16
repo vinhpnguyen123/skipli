@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:mm (24-hour)');
+// Stored overnight halves end at '24:00', and the client sends the stored week back on every edit.
+const endTime = z.union([time, z.literal('24:00')]);
 const shift = z
-  .object({ dayOfWeek: z.number().int().min(0).max(6), start: time, end: time })
+  .object({ dayOfWeek: z.number().int().min(0).max(6), start: time, end: endTime })
   .strict();
 export type Shift = { dayOfWeek: number; start: string; end: string };
 

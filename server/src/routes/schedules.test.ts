@@ -83,6 +83,18 @@ describe('PUT /employees/:id/schedule', () => {
     });
   });
 
+  it('accepts the stored week sent back with a change (overnight halves end at 24:00)', async () => {
+    const stored = (await put(ann.id, [shift(5, '22:00', '06:00')])).body.shifts;
+    const res = await put(ann.id, [...stored, shift(1, '09:00', '17:00')]);
+    expect(res.status).toBe(200);
+    expect(res.body.shifts).toEqual([
+      shift(1, '09:00', '17:00'),
+      shift(5, '22:00', '24:00'),
+      shift(6, '00:00', '06:00'),
+    ]);
+    expect((await put(ann.id, [shift(1, '24:00', '06:00')])).status).toBe(400);
+  });
+
   it('rejects overlapping shifts, including an overnight tail running into the next day', async () => {
     expect(
       (await put(ann.id, [shift(1, '09:00', '13:00'), shift(1, '12:00', '15:00')])).status,

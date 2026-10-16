@@ -35,7 +35,7 @@ const label = (t: string) =>
   });
 
 type Block = Shift & { employeeId: string; index: number };
-// index: position in that employee's shift list; absent = a new shift.
+// shift: the shift as it was when the dialog opened; index absent = a new shift.
 type Editing = { employeeId: string; index?: number; shift: Shift };
 
 export default function SchedulePage({ user }: { user: User }) {
@@ -72,12 +72,27 @@ export default function SchedulePage({ user }: { user: User }) {
     save.reset();
   };
 
-  // Replaces (or with null removes) one shift, or adds one, and saves the employee's whole week.
+  // Replaces (or with null removes) one shift, or adds one, and saves the employee's whole week. The edited
+  // shift is found again by day + start (stored shifts never overlap), not by its old index: another tab may
+  // have changed the week while the dialog was open.
   const commit = (e: Editing, next: Shift | null) => {
     const list = [...shiftsOf(e.employeeId)];
     if (e.index === undefined) list.push(next!);
-    else if (next) list[e.index] = next;
-    else list.splice(e.index, 1);
+    else {
+      const at = list.findIndex(
+        (s) => s.dayOfWeek === e.shift.dayOfWeek && s.start === e.shift.start,
+      );
+      if (at < 0) {
+        close();
+        setNotice({
+          tone: 'warn',
+          text: 'That shift was just changed elsewhere. Showing the latest schedule.',
+        });
+        return;
+      }
+      if (next) list[at] = next;
+      else list.splice(at, 1);
+    }
     save.mutate(
       { employeeId: e.employeeId, shifts: list },
       {
