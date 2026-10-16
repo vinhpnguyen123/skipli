@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useLogout } from '../features/auth/session';
+import { useActivityEvents } from '../features/activity/hooks';
 import { useChatEvents, useConversations } from '../features/chat/hooks';
 import { usePresenceEvents } from '../features/chat/presence';
 import { NotificationBell } from '../features/notifications/NotificationBell';
@@ -30,6 +31,7 @@ export function AppShell({ user }: { user: User }) {
   const unreadChats = conversations.data?.reduce((n, c) => n + c.unread, 0) ?? 0;
   useChatEvents(user.id);
   usePresenceEvents();
+  useActivityEvents();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -45,6 +47,9 @@ export function AppShell({ user }: { user: User }) {
                 Employees
               </NavLink>
             )}
+            <NavLink to="/schedule" className={navClass}>
+              Schedule
+            </NavLink>
             <NavLink to="/chat" className={navClass}>
               Chat
               {unreadChats > 0 && (
@@ -54,6 +59,11 @@ export function AppShell({ user }: { user: User }) {
                 </span>
               )}
             </NavLink>
+            {user.role === 'owner' && (
+              <NavLink to="/activity" className={navClass}>
+                Activity
+              </NavLink>
+            )}
             <NavLink to="/profile" className={navClass}>
               Profile
             </NavLink>

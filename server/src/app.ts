@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { env } from './env.js';
 import { errorHandler } from './lib/errors.js';
 import { requireVercelOrigin } from './middleware/origin.js';
+import { activitiesRouter } from './routes/activities.js';
 import { authRouter } from './routes/auth.js';
 import { chatRouter } from './routes/chat.js';
 import { cronRouter } from './routes/cron.js';
@@ -13,6 +14,7 @@ import { employeesRouter } from './routes/employees.js';
 import { meRouter } from './routes/me.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { ownerRouter } from './routes/owner.js';
+import { schedulesRouter } from './routes/schedules.js';
 import { tasksRouter } from './routes/tasks.js';
 
 export function createApp() {
@@ -43,6 +45,8 @@ export function createApp() {
   app.use('/api', tasksRouter);
   app.use('/api', notificationsRouter);
   app.use('/api', chatRouter);
+  app.use('/api', schedulesRouter);
+  app.use('/api', activitiesRouter);
   app.use('/api/cron', cronRouter);
 
   app.use(errorHandler);
